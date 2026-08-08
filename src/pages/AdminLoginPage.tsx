@@ -14,15 +14,15 @@ export function AdminLoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  if (isAuthenticated) {
-    return <Navigate to="/admin" replace />;
-  }
-
   const state = location.state as LoginLocationState | null;
   const destination =
     state?.from?.startsWith("/admin") && state.from !== "/admin/login"
       ? state.from
       : "/admin";
+
+  if (isAuthenticated) {
+    return <Navigate to={destination} replace />;
+  }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -42,9 +42,14 @@ export function AdminLoginPage() {
       <PageIntro
         eyebrow="Convenience gate"
         title="Admin access"
-        description="Enter the shared code to reveal data-entry tools. This client-side gate is not a security boundary."
+        description="Enter the shared code to reveal data-entry tools. This is a personal-app convenience gate, not a security boundary."
       />
       <form className="card" onSubmit={handleSubmit}>
+        {!isConfigured && (
+          <p className="mb-4 rounded-xl bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900" role="status">
+            Admin access is disabled because <code>VITE_ADMIN_ACCESS_CODE</code> is not configured for this deployment.
+          </p>
+        )}
         <label className="text-sm font-bold" htmlFor="admin-code">
           Access code
         </label>
@@ -59,6 +64,7 @@ export function AdminLoginPage() {
           }}
           autoComplete="current-password"
           disabled={!isConfigured}
+          required
         />
         {error && (
           <p className="mt-3 text-sm font-medium text-red-700" role="alert">
@@ -70,7 +76,7 @@ export function AdminLoginPage() {
           type="submit"
           disabled={!isConfigured || !code}
         >
-          Continue
+          {isConfigured ? "Continue" : "Admin access disabled"}
         </button>
       </form>
     </div>

@@ -64,6 +64,11 @@ export interface MatchInput {
   team2Result: MatchResultValue;
 }
 
+export interface EditableMatch {
+  id: string;
+  input: MatchInput;
+}
+
 function toMatchArgs(
   input: MatchInput,
 ): Database["public"]["Functions"]["record_match"]["Args"] {
@@ -149,6 +154,61 @@ export async function getMatch(matchId: string): Promise<MatchSummary | null> {
     team_1_players: data.team_1_players ?? [],
     team_2_players: data.team_2_players ?? [],
   });
+}
+
+export async function getEditableMatch(
+  matchId: string,
+): Promise<EditableMatch | null> {
+  const [matchResult, teamsResult, playersResult] = await Promise.all([
+    supabase.from("matches").select("*").eq("id", matchId).maybeSingle(),
+    supabase
+      .from("match_teams")
+      .select("id, team_number, result")
+      .eq("match_id", matchId)
+      .order("team_number"),
+    supabase
+      .from("match_team_players")
+      .select("match_team_id, player_id")
+      .eq("match_id", matchId),
+  ]);
+
+  throwIfError("Unable to load match", matchResult.error);
+  throwIfError("Unable to load match teams", teamsResult.error);
+  throwIfError("Unable to load match players", playersResult.error);
+  if (!matchResult.data) return null;
+
+  const team1 = teamsResult.data.find((team) => team.team_number === 1);
+  const team2 = teamsResult.data.find((team) => team.team_number === 2);
+  if (!team1 || !team2) {
+    throw new Error("The saved match does not contain two complete teams.");
+  }
+
+  const teamPlayerIds = (teamId: string) =>
+    playersResult.data
+      .filter((player) => player.match_team_id === teamId)
+      .map((player) => player.player_id);
+  const holes = matchResult.data.holes;
+  const teamSize = matchResult.data.team_size;
+  if ((holes !== 9 && holes !== 18) || (teamSize !== 1 && teamSize !== 2)) {
+    throw new Error("The saved match has an unsupported format.");
+  }
+
+  return {
+    id: matchResult.data.id,
+    input: {
+      date: matchResult.data.date,
+      courseId: matchResult.data.course_id,
+      holes,
+      teamSize,
+      scoreType: matchResult.data.score_type,
+      scoreValue: matchResult.data.score_value,
+      holesRemaining: matchResult.data.holes_remaining,
+      team1PlayerIds: teamPlayerIds(team1.id),
+      team2PlayerIds: teamPlayerIds(team2.id),
+      team1Result: team1.result,
+      team2Result: team2.result,
+    },
+  };
 }
 
 export async function getMatchRatings(

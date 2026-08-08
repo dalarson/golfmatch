@@ -10,7 +10,7 @@ export function AdminGuard() {
       <Navigate
         to="/admin/login"
         replace
-        state={{ from: location.pathname }}
+        state={{ from: `${location.pathname}${location.search}${location.hash}` }}
       />
     );
   }

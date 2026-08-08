@@ -1,6 +1,6 @@
 import { ArrowLeft, Flag, Minus, Trophy } from "lucide-react";
 import { useCallback } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import { EmptyState } from "../components/ui/EmptyState";
 import { ErrorState } from "../components/ui/ErrorState";
 import { LoadingState } from "../components/ui/LoadingState";
@@ -96,6 +96,8 @@ function TeamPanel({
 
 export function MatchDetailPage() {
   const { matchId } = useParams();
+  const location = useLocation();
+  const navigationState = location.state as { message?: string } | null;
   const load = useCallback(async () => {
     if (!matchId) return { match: null, ratings: [] };
     const [match, ratings] = await Promise.all([
@@ -135,6 +137,11 @@ export function MatchDetailPage() {
   const match = detail.data.match;
   return (
     <>
+      {navigationState?.message && (
+        <p className="mb-4 rounded-xl bg-fairway-50 px-4 py-3 text-sm font-semibold text-fairway-800" role="status">
+          {navigationState.message}
+        </p>
+      )}
       <Link
         to="/matches"
         className="mb-5 inline-flex min-h-11 items-center gap-2 rounded-xl text-sm font-bold text-fairway-800"

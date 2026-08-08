@@ -2,14 +2,18 @@ import { Route, Routes } from "react-router-dom";
 import { AdminGuard } from "./components/admin/AdminGuard";
 import { AppShell } from "./components/layout/AppShell";
 import { AdminLoginPage } from "./pages/AdminLoginPage";
+import { AdminEditMatchPage } from "./pages/AdminEditMatchPage";
+import { AdminMatchesPage } from "./pages/AdminMatchesPage";
+import { AdminNewMatchPage } from "./pages/AdminNewMatchPage";
+import { AdminCoursesPage } from "./pages/AdminCoursesPage";
 import { AdminPage } from "./pages/AdminPage";
+import { AdminPlayersPage } from "./pages/AdminPlayersPage";
 import { HomePage } from "./pages/HomePage";
 import { MatchDetailPage } from "./pages/MatchDetailPage";
 import { MatchesPage } from "./pages/MatchesPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 import { PlayerDetailPage } from "./pages/PlayerDetailPage";
 import { PlayersPage } from "./pages/PlayersPage";
-import { PlaceholderPage } from "./pages/PlaceholderPage";
 
 export function App() {
   return (
@@ -23,46 +27,11 @@ export function App() {
         <Route path="admin/login" element={<AdminLoginPage />} />
         <Route element={<AdminGuard />}>
           <Route path="admin" element={<AdminPage />} />
-          <Route
-            path="admin/players"
-            element={
-              <PlaceholderPage
-                eyebrow="Admin"
-                title="Manage players"
-                description="Create and update players through database RPCs."
-              />
-            }
-          />
-          <Route
-            path="admin/courses"
-            element={
-              <PlaceholderPage
-                eyebrow="Admin"
-                title="Manage courses"
-                description="Create and update course records through database RPCs."
-              />
-            }
-          />
-          <Route
-            path="admin/matches"
-            element={
-              <PlaceholderPage
-                eyebrow="Admin"
-                title="Manage matches"
-                description="Review the history and launch the match entry workflow."
-              />
-            }
-          />
-          <Route
-            path="admin/matches/new"
-            element={
-              <PlaceholderPage
-                eyebrow="Admin"
-                title="Log a match"
-                description="The step-based match entry workflow will call record_match atomically."
-              />
-            }
-          />
+          <Route path="admin/players" element={<AdminPlayersPage />} />
+          <Route path="admin/courses" element={<AdminCoursesPage />} />
+          <Route path="admin/matches" element={<AdminMatchesPage />} />
+          <Route path="admin/matches/new" element={<AdminNewMatchPage />} />
+          <Route path="admin/matches/:matchId/edit" element={<AdminEditMatchPage />} />
         </Route>
         <Route path="*" element={<NotFoundPage />} />
       </Route>
