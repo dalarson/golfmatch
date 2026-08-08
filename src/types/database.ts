@@ -375,6 +375,7 @@ export interface Database {
         Row: {
           match_id: string | null;
           date: string | null;
+          created_at: string;
           course_id: string | null;
           course_name: string | null;
           holes: number | null;
