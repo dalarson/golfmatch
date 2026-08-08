@@ -16,6 +16,7 @@ const matchPlayerSchema = z.object({
 const matchSummarySchema = z.object({
   match_id: z.string().uuid().nullable(),
   date: z.string().nullable(),
+  created_at: z.string(),
   course_id: z.string().uuid().nullable(),
   course_name: z.string().nullable(),
   holes: z.number().nullable(),
@@ -89,6 +90,7 @@ export async function getMatchHistory(
     .from("match_summary")
     .select("*")
     .order("date", { ascending: false })
+    .order("created_at", { ascending: false })
     .order("match_id", { ascending: false });
 
   if (filters.courseId) query = query.eq("course_id", filters.courseId);
@@ -118,6 +120,7 @@ export async function getMatchHistoryPage(
     .from("match_summary")
     .select("*", { count: "exact" })
     .order("date", { ascending: false })
+    .order("created_at", { ascending: false })
     .order("match_id", { ascending: false })
     .range(from, from + pageSize - 1);
   throwIfError("Unable to load match history", error);
