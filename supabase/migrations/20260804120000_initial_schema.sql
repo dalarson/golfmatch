@@ -803,6 +803,7 @@ as
 select
   m.id as match_id,
   m.date,
+  m.created_at,
   m.course_id,
   c.name as course_name,
   m.holes,
