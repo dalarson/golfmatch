@@ -13,6 +13,8 @@ npm ci
 
 ### 2. Apply the database migrations
 
+Back up existing project data before applying schema changes.
+
 For a hosted Supabase project:
 
 ```sh
@@ -29,6 +31,14 @@ npx supabase db reset
 ```
 
 Both paths apply every migration in `supabase/migrations`.
+
+Supabase records applied migration timestamps, so a normal `supabase db push` runs
+each migration once. The repository migrations are also intentionally safe to
+replay in timestamp order against an already compatible schema: replaceable
+objects are refreshed, seed settings are preserved, and tables or application
+data are never dropped. Replay is not a legacy-schema conversion mechanism; an
+incompatible existing enum or table causes the migration to stop rather than
+leaving a partially valid schema.
 
 ### 3. Configure the frontend
 

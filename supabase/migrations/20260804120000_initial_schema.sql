@@ -1,10 +1,152 @@
 create schema if not exists extensions;
 create extension if not exists pgcrypto with schema extensions;
 
-create type public.match_result as enum ('WIN', 'LOSS', 'PUSH');
-create type public.score_type as enum ('UP', 'HOLES_UP', 'PUSH');
+do $$
+begin
+  if to_regtype('public.match_result') is null then
+    create type public.match_result as enum ('WIN', 'LOSS', 'PUSH');
+  elsif not exists (
+    select 1
+    from pg_catalog.pg_type t
+    join pg_catalog.pg_namespace n on n.oid = t.typnamespace
+    where n.nspname = 'public'
+      and t.typname = 'match_result'
+      and t.typtype = 'e'
+      and (
+        select array_agg(e.enumlabel order by e.enumsortorder)
+        from pg_catalog.pg_enum e
+        where e.enumtypid = t.oid
+      ) = array['WIN', 'LOSS', 'PUSH']::name[]
+  ) then
+    raise exception 'public.match_result exists but is not the expected enum (WIN, LOSS, PUSH)';
+  end if;
 
-create table public.elo_settings (
+  if to_regtype('public.score_type') is null then
+    create type public.score_type as enum ('UP', 'HOLES_UP', 'PUSH');
+  elsif not exists (
+    select 1
+    from pg_catalog.pg_type t
+    join pg_catalog.pg_namespace n on n.oid = t.typnamespace
+    where n.nspname = 'public'
+      and t.typname = 'score_type'
+      and t.typtype = 'e'
+      and (
+        select array_agg(e.enumlabel order by e.enumsortorder)
+        from pg_catalog.pg_enum e
+        where e.enumtypid = t.oid
+      ) = array['UP', 'HOLES_UP', 'PUSH']::name[]
+  ) then
+    raise exception 'public.score_type exists but is not the expected enum (UP, HOLES_UP, PUSH)';
+  end if;
+end;
+$$;
+
+do $$
+declare
+  v_expected record;
+  v_actual_count integer;
+begin
+  for v_expected in
+    select *
+    from (values
+      ('elo_settings', 'id', 'boolean', true),
+      ('elo_settings', 'initial_rating', 'integer', true),
+      ('elo_settings', 'k_factor', 'integer', true),
+      ('elo_settings', 'updated_at', 'timestamp with time zone', true),
+      ('players', 'id', 'uuid', true),
+      ('players', 'name', 'text', true),
+      ('players', 'elo_rating', 'integer', true),
+      ('players', 'elo_peak', 'integer', true),
+      ('players', 'created_at', 'timestamp with time zone', true),
+      ('players', 'updated_at', 'timestamp with time zone', true),
+      ('courses', 'id', 'uuid', true),
+      ('courses', 'name', 'text', true),
+      ('courses', 'location', 'text', true),
+      ('courses', 'created_at', 'timestamp with time zone', true),
+      ('courses', 'updated_at', 'timestamp with time zone', true),
+      ('matches', 'id', 'uuid', true),
+      ('matches', 'date', 'date', true),
+      ('matches', 'course_id', 'uuid', true),
+      ('matches', 'holes', 'smallint', true),
+      ('matches', 'team_size', 'smallint', true),
+      ('matches', 'score_type', 'public.score_type', true),
+      ('matches', 'score_value', 'smallint', false),
+      ('matches', 'holes_remaining', 'smallint', false),
+      ('matches', 'created_at', 'timestamp with time zone', true),
+      ('matches', 'updated_at', 'timestamp with time zone', true),
+      ('match_teams', 'id', 'uuid', true),
+      ('match_teams', 'match_id', 'uuid', true),
+      ('match_teams', 'team_number', 'smallint', true),
+      ('match_teams', 'result', 'public.match_result', true),
+      ('match_teams', 'created_at', 'timestamp with time zone', true),
+      ('match_team_players', 'id', 'uuid', true),
+      ('match_team_players', 'match_team_id', 'uuid', true),
+      ('match_team_players', 'match_id', 'uuid', true),
+      ('match_team_players', 'player_id', 'uuid', true),
+      ('match_team_players', 'created_at', 'timestamp with time zone', true),
+      ('player_ratings', 'id', 'uuid', true),
+      ('player_ratings', 'player_id', 'uuid', true),
+      ('player_ratings', 'match_id', 'uuid', true),
+      ('player_ratings', 'match_team_id', 'uuid', true),
+      ('player_ratings', 'rating_before', 'integer', true),
+      ('player_ratings', 'rating_after', 'integer', true),
+      ('player_ratings', 'rating_change', 'integer', true),
+      ('player_ratings', 'team_rating', 'numeric', true),
+      ('player_ratings', 'opponent_team_rating', 'numeric', true),
+      ('player_ratings', 'created_at', 'timestamp with time zone', true)
+    ) expected(table_name, column_name, type_name, is_not_null)
+  loop
+    if to_regclass(format('public.%I', v_expected.table_name)) is not null then
+      if not exists (
+        select 1
+        from pg_catalog.pg_attribute a
+        where a.attrelid = format('public.%I', v_expected.table_name)::regclass
+          and a.attname = v_expected.column_name
+          and a.atttypid = to_regtype(v_expected.type_name)
+          and a.attnotnull = v_expected.is_not_null
+          and a.attnum > 0
+          and not a.attisdropped
+        ) then
+        raise exception
+          'public.% has an incompatible or missing column %. Expected % %.',
+          v_expected.table_name,
+          v_expected.column_name,
+          v_expected.type_name,
+          case when v_expected.is_not_null then 'NOT NULL' else 'NULLABLE' end;
+      end if;
+    end if;
+  end loop;
+
+  for v_expected in
+    select *
+    from (values
+      ('elo_settings', 4),
+      ('players', 6),
+      ('courses', 5),
+      ('matches', 10),
+      ('match_teams', 5),
+      ('match_team_players', 5),
+      ('player_ratings', 10)
+    ) expected(table_name, column_count)
+  loop
+    if to_regclass(format('public.%I', v_expected.table_name)) is not null then
+      select count(*) into v_actual_count
+      from pg_catalog.pg_attribute a
+      where a.attrelid = format('public.%I', v_expected.table_name)::regclass
+        and a.attnum > 0
+        and not a.attisdropped;
+
+      if v_actual_count <> v_expected.column_count then
+        raise exception
+          'public.% has % columns; expected %. Refusing to continue with an incompatible table.',
+          v_expected.table_name, v_actual_count, v_expected.column_count;
+      end if;
+    end if;
+  end loop;
+end;
+$$;
+
+create table if not exists public.elo_settings (
   id boolean primary key default true check (id),
   initial_rating integer not null default 1500 check (initial_rating > 0),
   k_factor integer not null default 32 check (k_factor > 0),
@@ -12,9 +154,10 @@ create table public.elo_settings (
 );
 
 insert into public.elo_settings (id, initial_rating, k_factor)
-values (true, 1500, 32);
+values (true, 1500, 32)
+on conflict (id) do nothing;
 
-create table public.players (
+create table if not exists public.players (
   id uuid primary key default extensions.gen_random_uuid(),
   name text not null check (btrim(name) <> ''),
   elo_rating integer not null default 1500 check (elo_rating > 0),
@@ -23,9 +166,9 @@ create table public.players (
   updated_at timestamptz not null default now()
 );
 
-create unique index players_name_unique_idx on public.players (lower(btrim(name)));
+create unique index if not exists players_name_unique_idx on public.players (lower(btrim(name)));
 
-create table public.courses (
+create table if not exists public.courses (
   id uuid primary key default extensions.gen_random_uuid(),
   name text not null check (btrim(name) <> ''),
   location text not null check (btrim(location) <> ''),
@@ -33,10 +176,10 @@ create table public.courses (
   updated_at timestamptz not null default now()
 );
 
-create unique index courses_name_location_unique_idx
+create unique index if not exists courses_name_location_unique_idx
   on public.courses (lower(btrim(name)), lower(btrim(location)));
 
-create table public.matches (
+create table if not exists public.matches (
   id uuid primary key default extensions.gen_random_uuid(),
   date date not null default current_date,
   course_id uuid not null references public.courses(id) on delete restrict,
@@ -69,7 +212,7 @@ create table public.matches (
   )
 );
 
-create table public.match_teams (
+create table if not exists public.match_teams (
   id uuid primary key default extensions.gen_random_uuid(),
   match_id uuid not null references public.matches(id) on delete cascade,
   team_number smallint not null check (team_number in (1, 2)),
@@ -79,7 +222,7 @@ create table public.match_teams (
   unique (id, match_id)
 );
 
-create table public.match_team_players (
+create table if not exists public.match_team_players (
   id uuid primary key default extensions.gen_random_uuid(),
   match_team_id uuid not null references public.match_teams(id) on delete cascade,
   match_id uuid not null references public.matches(id) on delete cascade,
@@ -91,7 +234,7 @@ create table public.match_team_players (
     references public.match_teams(id, match_id) on delete cascade
 );
 
-create table public.player_ratings (
+create table if not exists public.player_ratings (
   id uuid primary key default extensions.gen_random_uuid(),
   player_id uuid not null references public.players(id) on delete cascade,
   match_id uuid not null references public.matches(id) on delete cascade,
@@ -108,15 +251,241 @@ create table public.player_ratings (
   check (rating_after = rating_before + rating_change)
 );
 
-create index matches_date_order_idx on public.matches (date, created_at, id);
-create index matches_course_date_idx on public.matches (course_id, date);
-create index match_teams_match_id_idx on public.match_teams (match_id);
-create index match_team_players_team_idx on public.match_team_players (match_team_id);
-create index match_team_players_player_idx on public.match_team_players (player_id);
-create index player_ratings_player_created_idx on public.player_ratings (player_id, created_at);
-create index player_ratings_match_idx on public.player_ratings (match_id);
+do $$
+declare
+  v_expected record;
+  v_actual_count integer;
+begin
+  for v_expected in
+    select *
+    from (values
+      ('elo_settings', 'id', 'boolean', true),
+      ('elo_settings', 'initial_rating', 'integer', true),
+      ('elo_settings', 'k_factor', 'integer', true),
+      ('elo_settings', 'updated_at', 'timestamp with time zone', true),
+      ('players', 'id', 'uuid', true),
+      ('players', 'name', 'text', true),
+      ('players', 'elo_rating', 'integer', true),
+      ('players', 'elo_peak', 'integer', true),
+      ('players', 'created_at', 'timestamp with time zone', true),
+      ('players', 'updated_at', 'timestamp with time zone', true),
+      ('courses', 'id', 'uuid', true),
+      ('courses', 'name', 'text', true),
+      ('courses', 'location', 'text', true),
+      ('courses', 'created_at', 'timestamp with time zone', true),
+      ('courses', 'updated_at', 'timestamp with time zone', true),
+      ('matches', 'id', 'uuid', true),
+      ('matches', 'date', 'date', true),
+      ('matches', 'course_id', 'uuid', true),
+      ('matches', 'holes', 'smallint', true),
+      ('matches', 'team_size', 'smallint', true),
+      ('matches', 'score_type', 'public.score_type', true),
+      ('matches', 'score_value', 'smallint', false),
+      ('matches', 'holes_remaining', 'smallint', false),
+      ('matches', 'created_at', 'timestamp with time zone', true),
+      ('matches', 'updated_at', 'timestamp with time zone', true),
+      ('match_teams', 'id', 'uuid', true),
+      ('match_teams', 'match_id', 'uuid', true),
+      ('match_teams', 'team_number', 'smallint', true),
+      ('match_teams', 'result', 'public.match_result', true),
+      ('match_teams', 'created_at', 'timestamp with time zone', true),
+      ('match_team_players', 'id', 'uuid', true),
+      ('match_team_players', 'match_team_id', 'uuid', true),
+      ('match_team_players', 'match_id', 'uuid', true),
+      ('match_team_players', 'player_id', 'uuid', true),
+      ('match_team_players', 'created_at', 'timestamp with time zone', true),
+      ('player_ratings', 'id', 'uuid', true),
+      ('player_ratings', 'player_id', 'uuid', true),
+      ('player_ratings', 'match_id', 'uuid', true),
+      ('player_ratings', 'match_team_id', 'uuid', true),
+      ('player_ratings', 'rating_before', 'integer', true),
+      ('player_ratings', 'rating_after', 'integer', true),
+      ('player_ratings', 'rating_change', 'integer', true),
+      ('player_ratings', 'team_rating', 'numeric', true),
+      ('player_ratings', 'opponent_team_rating', 'numeric', true),
+      ('player_ratings', 'created_at', 'timestamp with time zone', true)
+    ) expected(table_name, column_name, type_name, is_not_null)
+  loop
+    if not exists (
+      select 1
+      from pg_catalog.pg_attribute a
+      where a.attrelid = format('public.%I', v_expected.table_name)::regclass
+        and a.attname = v_expected.column_name
+        and a.atttypid = to_regtype(v_expected.type_name)
+        and a.attnotnull = v_expected.is_not_null
+        and a.attnum > 0
+        and not a.attisdropped
+    ) then
+      raise exception
+        'public.% has an incompatible or missing column %. Expected % %.',
+        v_expected.table_name,
+        v_expected.column_name,
+        v_expected.type_name,
+        case when v_expected.is_not_null then 'NOT NULL' else 'NULLABLE' end;
+    end if;
+  end loop;
 
-create function public.calculate_elo_expected(rating_a numeric, rating_b numeric)
+  for v_expected in
+    select *
+    from (values
+      ('elo_settings', 4),
+      ('players', 6),
+      ('courses', 5),
+      ('matches', 10),
+      ('match_teams', 5),
+      ('match_team_players', 5),
+      ('player_ratings', 10)
+    ) expected(table_name, column_count)
+  loop
+    select count(*) into v_actual_count
+    from pg_catalog.pg_attribute a
+    where a.attrelid = format('public.%I', v_expected.table_name)::regclass
+      and a.attnum > 0
+      and not a.attisdropped;
+
+    if v_actual_count <> v_expected.column_count then
+      raise exception
+        'public.% has % columns; expected %. Refusing to continue with an incompatible table.',
+        v_expected.table_name, v_actual_count, v_expected.column_count;
+    end if;
+  end loop;
+
+  for v_expected in
+    select *
+    from (values
+      ('elo_settings', 'elo_settings_pkey', 'p'),
+      ('elo_settings', 'elo_settings_id_check', 'c'),
+      ('elo_settings', 'elo_settings_initial_rating_check', 'c'),
+      ('elo_settings', 'elo_settings_k_factor_check', 'c'),
+      ('players', 'players_pkey', 'p'),
+      ('players', 'players_name_check', 'c'),
+      ('players', 'players_elo_rating_check', 'c'),
+      ('players', 'players_check', 'c'),
+      ('courses', 'courses_pkey', 'p'),
+      ('courses', 'courses_name_check', 'c'),
+      ('courses', 'courses_location_check', 'c'),
+      ('matches', 'matches_pkey', 'p'),
+      ('matches', 'matches_course_id_fkey', 'f'),
+      ('matches', 'matches_holes_check', 'c'),
+      ('matches', 'matches_team_size_check', 'c'),
+      ('matches', 'matches_score_representation_check', 'c'),
+      ('match_teams', 'match_teams_pkey', 'p'),
+      ('match_teams', 'match_teams_match_id_fkey', 'f'),
+      ('match_teams', 'match_teams_team_number_check', 'c'),
+      ('match_teams', 'match_teams_match_id_team_number_key', 'u'),
+      ('match_teams', 'match_teams_id_match_id_key', 'u'),
+      ('match_team_players', 'match_team_players_pkey', 'p'),
+      ('match_team_players', 'match_team_players_match_team_id_fkey', 'f'),
+      ('match_team_players', 'match_team_players_match_id_fkey', 'f'),
+      ('match_team_players', 'match_team_players_player_id_fkey', 'f'),
+      ('match_team_players', 'match_team_players_match_team_id_player_id_key', 'u'),
+      ('match_team_players', 'match_team_players_match_id_player_id_key', 'u'),
+      ('match_team_players', 'match_team_players_match_team_id_match_id_fkey', 'f'),
+      ('player_ratings', 'player_ratings_pkey', 'p'),
+      ('player_ratings', 'player_ratings_player_id_fkey', 'f'),
+      ('player_ratings', 'player_ratings_match_id_fkey', 'f'),
+      ('player_ratings', 'player_ratings_match_team_id_fkey', 'f'),
+      ('player_ratings', 'player_ratings_rating_before_check', 'c'),
+      ('player_ratings', 'player_ratings_rating_after_check', 'c'),
+      ('player_ratings', 'player_ratings_match_id_player_id_key', 'u'),
+      ('player_ratings', 'player_ratings_match_team_id_match_id_fkey', 'f'),
+      ('player_ratings', 'player_ratings_check', 'c')
+    ) expected(table_name, constraint_name, constraint_type)
+  loop
+    if not exists (
+      select 1
+      from pg_catalog.pg_constraint c
+      where c.conrelid = format('public.%I', v_expected.table_name)::regclass
+        and c.conname = v_expected.constraint_name
+        and c.contype = v_expected.constraint_type::"char"
+        and c.convalidated
+    ) then
+      raise exception
+        'public.% is missing required % constraint %. Refusing to continue with an incompatible table.',
+        v_expected.table_name, v_expected.constraint_type, v_expected.constraint_name;
+    end if;
+  end loop;
+
+  for v_expected in
+    select *
+    from (values
+      ('elo_settings', 4),
+      ('players', 4),
+      ('courses', 3),
+      ('matches', 5),
+      ('match_teams', 5),
+      ('match_team_players', 7),
+      ('player_ratings', 9)
+    ) expected(table_name, constraint_count)
+  loop
+    select count(*) into v_actual_count
+    from pg_catalog.pg_constraint c
+    where c.conrelid = format('public.%I', v_expected.table_name)::regclass
+      and c.contype <> 't';
+
+    if v_actual_count <> v_expected.constraint_count then
+      raise exception
+        'public.% has % non-trigger constraints; expected %. Refusing to continue with an incompatible table.',
+        v_expected.table_name, v_actual_count, v_expected.constraint_count;
+    end if;
+  end loop;
+end;
+$$;
+
+create index if not exists matches_date_order_idx on public.matches (date, created_at, id);
+create index if not exists matches_course_date_idx on public.matches (course_id, date);
+create index if not exists match_teams_match_id_idx on public.match_teams (match_id);
+create index if not exists match_team_players_team_idx on public.match_team_players (match_team_id);
+create index if not exists match_team_players_player_idx on public.match_team_players (player_id);
+create index if not exists player_ratings_player_created_idx on public.player_ratings (player_id, created_at);
+create index if not exists player_ratings_match_idx on public.player_ratings (match_id);
+
+do $$
+declare
+  v_expected record;
+  v_actual_definition text;
+begin
+  for v_expected in
+    select *
+    from (values
+      ('players_name_unique_idx',
+       'CREATE UNIQUE INDEX players_name_unique_idx ON public.players USING btree (lower(btrim(name)))'),
+      ('courses_name_location_unique_idx',
+       'CREATE UNIQUE INDEX courses_name_location_unique_idx ON public.courses USING btree (lower(btrim(name)), lower(btrim(location)))'),
+      ('matches_date_order_idx',
+       'CREATE INDEX matches_date_order_idx ON public.matches USING btree (date, created_at, id)'),
+      ('matches_course_date_idx',
+       'CREATE INDEX matches_course_date_idx ON public.matches USING btree (course_id, date)'),
+      ('match_teams_match_id_idx',
+       'CREATE INDEX match_teams_match_id_idx ON public.match_teams USING btree (match_id)'),
+      ('match_team_players_team_idx',
+       'CREATE INDEX match_team_players_team_idx ON public.match_team_players USING btree (match_team_id)'),
+      ('match_team_players_player_idx',
+       'CREATE INDEX match_team_players_player_idx ON public.match_team_players USING btree (player_id)'),
+      ('player_ratings_player_created_idx',
+       'CREATE INDEX player_ratings_player_created_idx ON public.player_ratings USING btree (player_id, created_at)'),
+      ('player_ratings_match_idx',
+       'CREATE INDEX player_ratings_match_idx ON public.player_ratings USING btree (match_id)')
+    ) expected(index_name, index_definition)
+  loop
+    select pg_catalog.pg_get_indexdef(c.oid)
+    into v_actual_definition
+    from pg_catalog.pg_class c
+    join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public'
+      and c.relname = v_expected.index_name
+      and c.relkind = 'i';
+
+    if v_actual_definition is distinct from v_expected.index_definition then
+      raise exception
+        'public.% has an incompatible definition. Expected: %',
+        v_expected.index_name, v_expected.index_definition;
+    end if;
+  end loop;
+end;
+$$;
+
+create or replace function public.calculate_elo_expected(rating_a numeric, rating_b numeric)
 returns numeric
 language sql
 immutable
@@ -127,7 +496,7 @@ as $$
   select 1.0 / (1.0 + power(10.0, (rating_b - rating_a) / 400.0));
 $$;
 
-create function public.get_result_value(result public.match_result)
+create or replace function public.get_result_value(result public.match_result)
 returns numeric
 language sql
 immutable
@@ -142,7 +511,7 @@ as $$
   end;
 $$;
 
-create function public.format_match_score(
+create or replace function public.format_match_score(
   score_type public.score_type,
   score_value integer,
   holes_remaining integer
@@ -160,7 +529,7 @@ as $$
   end;
 $$;
 
-create function public.validate_match_input(
+create or replace function public.validate_match_input(
   p_holes smallint,
   p_team_size smallint,
   p_score_type public.score_type,
@@ -232,7 +601,7 @@ begin
 end;
 $$;
 
-create function public.assert_match_structure(p_match_id uuid)
+create or replace function public.assert_match_structure(p_match_id uuid)
 returns void
 language plpgsql
 set search_path = pg_catalog, public
@@ -276,7 +645,7 @@ begin
 end;
 $$;
 
-create function public.enforce_match_structure()
+create or replace function public.enforce_match_structure()
 returns trigger
 language plpgsql
 set search_path = pg_catalog, public
@@ -294,22 +663,25 @@ begin
 end;
 $$;
 
+drop trigger if exists matches_structure_check on public.matches;
 create constraint trigger matches_structure_check
 after insert or update on public.matches
 deferrable initially deferred
 for each row execute function public.enforce_match_structure();
 
+drop trigger if exists match_teams_structure_check on public.match_teams;
 create constraint trigger match_teams_structure_check
 after insert or update or delete on public.match_teams
 deferrable initially deferred
 for each row execute function public.enforce_match_structure();
 
+drop trigger if exists match_team_players_structure_check on public.match_team_players;
 create constraint trigger match_team_players_structure_check
 after insert or update or delete on public.match_team_players
 deferrable initially deferred
 for each row execute function public.enforce_match_structure();
 
-create function public.apply_match_elo(
+create or replace function public.apply_match_elo(
   p_match_id uuid,
   p_k_factor integer
 )
@@ -387,7 +759,7 @@ begin
 end;
 $$;
 
-create function public.recalculate_all_elo()
+create or replace function public.recalculate_all_elo()
 returns table (players_processed integer, matches_processed integer)
 language plpgsql
 security definer
@@ -422,7 +794,7 @@ begin
 end;
 $$;
 
-create function public.create_player(p_name text)
+create or replace function public.create_player(p_name text)
 returns uuid
 language plpgsql
 security definer
@@ -443,7 +815,7 @@ begin
 end;
 $$;
 
-create function public.update_player(p_player_id uuid, p_name text)
+create or replace function public.update_player(p_player_id uuid, p_name text)
 returns public.players
 language plpgsql
 security definer
@@ -466,7 +838,7 @@ begin
 end;
 $$;
 
-create function public.create_course(p_name text, p_location text)
+create or replace function public.create_course(p_name text, p_location text)
 returns uuid
 language plpgsql
 security definer
@@ -486,7 +858,7 @@ begin
 end;
 $$;
 
-create function public.update_course(p_course_id uuid, p_name text, p_location text)
+create or replace function public.update_course(p_course_id uuid, p_name text, p_location text)
 returns public.courses
 language plpgsql
 security definer
@@ -510,7 +882,7 @@ begin
 end;
 $$;
 
-create function public.write_match(
+create or replace function public.write_match(
   p_match_id uuid,
   p_date date,
   p_course_id uuid,
@@ -580,7 +952,7 @@ begin
 end;
 $$;
 
-create function public.record_match(
+create or replace function public.record_match(
   p_date date,
   p_course_id uuid,
   p_holes smallint,
@@ -612,7 +984,7 @@ begin
 end;
 $$;
 
-create function public.update_match(
+create or replace function public.update_match(
   p_match_id uuid,
   p_date date,
   p_course_id uuid,
@@ -645,7 +1017,7 @@ begin
 end;
 $$;
 
-create function public.delete_match(p_match_id uuid)
+create or replace function public.delete_match(p_match_id uuid)
 returns void
 language plpgsql
 security definer
@@ -661,7 +1033,7 @@ begin
 end;
 $$;
 
-create view public.player_records
+create or replace view public.player_records
 with (security_invoker = true)
 as
 select
@@ -678,7 +1050,7 @@ left join public.match_team_players mtp on mtp.player_id = p.id
 left join public.match_teams mt on mt.id = mtp.match_team_id
 group by p.id;
 
-create view public.leaderboard
+create or replace view public.leaderboard
 with (security_invoker = true)
 as
 select
@@ -695,7 +1067,7 @@ select
 from public.players p
 join public.player_records r on r.player_id = p.id;
 
-create view public.player_course_records
+create or replace view public.player_course_records
 with (security_invoker = true)
 as
 select
@@ -715,7 +1087,7 @@ join public.courses c on c.id = m.course_id
 left join public.player_ratings pr on pr.match_id = m.id and pr.player_id = mtp.player_id
 group by mtp.player_id, c.id, c.name;
 
-create view public.player_partnerships
+create or replace view public.player_partnerships
 with (security_invoker = true)
 as
 with pairs as (
@@ -742,7 +1114,7 @@ join public.players p on p.id = d.player_id
 join public.players partner on partner.id = d.partner_id
 group by d.player_id, d.partner_id, p.name, partner.name;
 
-create view public.player_head_to_head
+create or replace view public.player_head_to_head
 with (security_invoker = true)
 as
 with opponents as (
@@ -764,7 +1136,7 @@ join public.players p on p.id = o.player_id
 join public.players opponent on opponent.id = o.opponent_id
 group by o.player_id, o.opponent_id, p.name, opponent.name;
 
-create view public.player_match_history
+create or replace view public.player_match_history
 with (security_invoker = true)
 as
 select
@@ -781,23 +1153,24 @@ select
   m.holes_remaining,
   pr.rating_before as elo_before,
   pr.rating_after as elo_after,
-  pr.rating_change as elo_change
+  pr.rating_change as elo_change,
+  m.created_at
 from public.matches m
 join public.courses c on c.id = m.course_id
 join public.match_teams mt on mt.match_id = m.id
 join public.match_team_players mtp on mtp.match_team_id = mt.id
 join public.player_ratings pr on pr.match_id = m.id and pr.player_id = mtp.player_id;
 
-create view public.player_elo_history
+create or replace view public.player_elo_history
 with (security_invoker = true)
 as
 select pr.player_id, pr.match_id, m.date, c.name as course_name,
-       pr.rating_before, pr.rating_after, pr.rating_change
+       pr.rating_before, pr.rating_after, pr.rating_change, m.created_at
 from public.player_ratings pr
 join public.matches m on m.id = pr.match_id
 join public.courses c on c.id = m.course_id;
 
-create view public.match_summary
+create or replace view public.match_summary
 with (security_invoker = true)
 as
 select
@@ -824,7 +1197,7 @@ join public.match_team_players mtp on mtp.match_team_id = mt.id
 join public.players p on p.id = mtp.player_id
 group by m.id, c.id, c.name;
 
-create view public.match_analytics
+create or replace view public.match_analytics
 with (security_invoker = true)
 as
 with team_ratings as (
@@ -853,7 +1226,7 @@ select
 from team_ratings
 group by match_id, date, course_id, holes, team_size;
 
-create function public.get_player_stats(
+create or replace function public.get_player_stats(
   p_player_id uuid,
   p_course_id uuid default null,
   p_partner_id uuid default null,
@@ -911,7 +1284,7 @@ as $$
   from filtered;
 $$;
 
-create function public.get_player_overview(p_player_id uuid)
+create or replace function public.get_player_overview(p_player_id uuid)
 returns table (
   player_id uuid,
   name text,
@@ -960,12 +1333,19 @@ alter table public.match_teams enable row level security;
 alter table public.match_team_players enable row level security;
 alter table public.player_ratings enable row level security;
 
+drop policy if exists "Public read ELO settings" on public.elo_settings;
 create policy "Public read ELO settings" on public.elo_settings for select using (true);
+drop policy if exists "Public read players" on public.players;
 create policy "Public read players" on public.players for select using (true);
+drop policy if exists "Public read courses" on public.courses;
 create policy "Public read courses" on public.courses for select using (true);
+drop policy if exists "Public read matches" on public.matches;
 create policy "Public read matches" on public.matches for select using (true);
+drop policy if exists "Public read match teams" on public.match_teams;
 create policy "Public read match teams" on public.match_teams for select using (true);
+drop policy if exists "Public read match team players" on public.match_team_players;
 create policy "Public read match team players" on public.match_team_players for select using (true);
+drop policy if exists "Public read player ratings" on public.player_ratings;
 create policy "Public read player ratings" on public.player_ratings for select using (true);
 
 revoke all on all tables in schema public from public, anon, authenticated;
