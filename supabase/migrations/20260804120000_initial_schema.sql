@@ -995,4 +995,4 @@ grant execute on function public.create_player(text),
     smallint, smallint, uuid[], uuid[], public.match_result, public.match_result),
   public.delete_match(uuid),
   public.recalculate_all_elo()
-to authenticated;
+to anon, authenticated;
