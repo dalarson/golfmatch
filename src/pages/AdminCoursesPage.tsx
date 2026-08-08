@@ -34,6 +34,7 @@ function CourseDialog({
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (isSubmitting) return;
     const parsed = courseSchema.safeParse({ name, location });
     if (!parsed.success) {
       setError(parsed.error.issues[0]?.message ?? "Enter valid course details.");
@@ -61,8 +62,9 @@ function CourseDialog({
       title={course ? "Edit course" : "Add course"}
       description="Course names and locations appear in match entry and public history."
       onClose={onClose}
+      isPending={isSubmitting}
     >
-      <form className="space-y-4" onSubmit={(event) => void handleSubmit(event)}>
+      <form aria-busy={isSubmitting} className="space-y-4" onSubmit={(event) => void handleSubmit(event)}>
         <label className="block text-sm font-bold" htmlFor="course-name">
           Course name
           <input

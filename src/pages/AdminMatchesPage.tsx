@@ -27,7 +27,7 @@ function DeleteMatchDialog({
   const [error, setError] = useState("");
 
   async function handleDelete() {
-    if (!match.match_id) return;
+    if (!match.match_id || isDeleting) return;
     setIsDeleting(true);
     setError("");
     try {
@@ -44,20 +44,23 @@ function DeleteMatchDialog({
       title="Delete match?"
       description="This action cannot be undone."
       onClose={onClose}
+      isPending={isDeleting}
     >
-      <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold leading-6 text-red-800">
-        Deleting this historical match will rebuild all player ratings from the remaining match history.
-      </p>
-      <p className="mt-4 text-sm text-slate-600">
-        {match.date ? formatMatchDate(match.date, "MMMM d, yyyy") : "Unknown date"} · {teamNames(match.team_1_players)} vs {teamNames(match.team_2_players)}
-      </p>
-      {error && <p className="mt-3 text-sm font-semibold text-red-700" role="alert">{error}</p>}
-      <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-        <button className="button-secondary" type="button" onClick={onClose} disabled={isDeleting}>Cancel</button>
-        <button className="button bg-red-700 text-white hover:bg-red-800" type="button" onClick={() => void handleDelete()} disabled={isDeleting}>
-          <Trash2 aria-hidden="true" size={18} />
-          {isDeleting ? "Deleting & recalculating…" : "Delete & recalculate"}
-        </button>
+      <div aria-busy={isDeleting}>
+        <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold leading-6 text-red-800">
+          Deleting this historical match will rebuild all player ratings from the remaining match history.
+        </p>
+        <p className="mt-4 text-sm text-slate-600">
+          {match.date ? formatMatchDate(match.date, "MMMM d, yyyy") : "Unknown date"} · {teamNames(match.team_1_players)} vs {teamNames(match.team_2_players)}
+        </p>
+        {error && <p className="mt-3 text-sm font-semibold text-red-700" role="alert">{error}</p>}
+        <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <button className="button-secondary" type="button" onClick={onClose} disabled={isDeleting}>Cancel</button>
+          <button className="button bg-red-700 text-white hover:bg-red-800" type="button" onClick={() => void handleDelete()} disabled={isDeleting}>
+            <Trash2 aria-hidden="true" size={18} />
+            {isDeleting ? "Deleting & recalculating…" : "Delete & recalculate"}
+          </button>
+        </div>
       </div>
     </Dialog>
   );

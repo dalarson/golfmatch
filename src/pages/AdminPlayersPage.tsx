@@ -33,6 +33,7 @@ function PlayerDialog({
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (isSubmitting) return;
     const parsed = playerSchema.safeParse({ name });
     if (!parsed.success) {
       setError(parsed.error.issues[0]?.message ?? "Enter a valid player name.");
@@ -64,8 +65,9 @@ function PlayerDialog({
           : "New players start at the configured initial ELO."
       }
       onClose={onClose}
+      isPending={isSubmitting}
     >
-      <form onSubmit={(event) => void handleSubmit(event)}>
+      <form aria-busy={isSubmitting} onSubmit={(event) => void handleSubmit(event)}>
         <label className="text-sm font-bold" htmlFor="player-name">
           Display name
         </label>
