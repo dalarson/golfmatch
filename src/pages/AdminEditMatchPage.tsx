@@ -1,5 +1,5 @@
 import { AlertTriangle } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { MatchForm } from "../components/admin/MatchForm";
 import { EmptyState } from "../components/ui/EmptyState";
@@ -27,9 +27,11 @@ export function AdminEditMatchPage() {
   const data = useAsyncData(load);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submissionError, setSubmissionError] = useState("");
+  const submissionLock = useRef(false);
 
   async function handleSubmit(value: MatchInput) {
-    if (!matchId) return;
+    if (!matchId || submissionLock.current) return;
+    submissionLock.current = true;
     setIsSubmitting(true);
     setSubmissionError("");
     try {
@@ -41,6 +43,7 @@ export function AdminEditMatchPage() {
     } catch (error) {
       setSubmissionError(getServiceErrorMessage(error, "Unable to update the match."));
       setIsSubmitting(false);
+      submissionLock.current = false;
     }
   }
 

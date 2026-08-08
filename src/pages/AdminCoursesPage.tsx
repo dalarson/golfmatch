@@ -1,5 +1,5 @@
 import { MapPin, Pencil, Plus } from "lucide-react";
-import { useCallback, useState, type FormEvent } from "react";
+import { useCallback, useRef, useState, type FormEvent } from "react";
 import { z } from "zod";
 import { Dialog } from "../components/ui/Dialog";
 import { EmptyState } from "../components/ui/EmptyState";
@@ -8,15 +8,13 @@ import { LoadingState } from "../components/ui/LoadingState";
 import { PageIntro } from "../components/ui/PageIntro";
 import { useAsyncData } from "../hooks/useAsyncData";
 import { createCourse, getCourses, updateCourse } from "../services/courses";
+import type { Course } from "../services/schemas";
 import { getServiceErrorMessage } from "../services/shared";
-import type { TableRow } from "../types/database";
 
 const courseSchema = z.object({
   name: z.string().trim().min(1, "Enter a course name.").max(120, "Use 120 characters or fewer."),
   location: z.string().trim().min(1, "Enter a location.").max(160, "Use 160 characters or fewer."),
 });
-
-type Course = TableRow<"courses">;
 
 function CourseDialog({
   course,
@@ -31,16 +29,18 @@ function CourseDialog({
   const [location, setLocation] = useState(course?.location ?? "");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const submissionLock = useRef(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (isSubmitting) return;
+    if (submissionLock.current) return;
     const parsed = courseSchema.safeParse({ name, location });
     if (!parsed.success) {
       setError(parsed.error.issues[0]?.message ?? "Enter valid course details.");
       return;
     }
 
+    submissionLock.current = true;
     setIsSubmitting(true);
     setError("");
     try {
@@ -54,6 +54,7 @@ function CourseDialog({
     } catch (submissionError) {
       setError(getServiceErrorMessage(submissionError, "Unable to save the course."));
       setIsSubmitting(false);
+      submissionLock.current = false;
     }
   }
 
@@ -77,6 +78,9 @@ function CourseDialog({
               setError("");
             }}
             disabled={isSubmitting}
+            maxLength={120}
+            aria-invalid={Boolean(error)}
+            aria-describedby={error ? "course-form-error" : undefined}
           />
         </label>
         <label className="block text-sm font-bold" htmlFor="course-location">
@@ -90,9 +94,12 @@ function CourseDialog({
               setError("");
             }}
             disabled={isSubmitting}
+            maxLength={160}
+            aria-invalid={Boolean(error)}
+            aria-describedby={error ? "course-form-error" : undefined}
           />
         </label>
-        {error && <p className="text-sm font-semibold text-red-700" role="alert">{error}</p>}
+        {error && <p id="course-form-error" className="text-sm font-semibold text-red-700" role="alert">{error}</p>}
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <button className="button-secondary" type="button" onClick={onClose} disabled={isSubmitting}>Cancel</button>
           <button className="button-primary" type="submit" disabled={isSubmitting}>

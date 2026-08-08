@@ -3,10 +3,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { z } from "zod";
 import { cn, formatMatchDate } from "../../lib/utils";
 import type { MatchInput } from "../../services/matches";
-import type { TableRow } from "../../types/database";
-
-type Player = TableRow<"players">;
-type Course = TableRow<"courses">;
+import type { Course, Player } from "../../services/schemas";
 
 const detailsSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Choose a match date."),
@@ -328,21 +325,33 @@ export function MatchForm({
             <div className="flex items-center gap-2 text-fairway-700"><Check aria-hidden="true" size={18} /><p className="eyebrow">Ready to save</p></div>
             <h2 ref={stepHeadingRef} tabIndex={-1} id="review-title" className="mt-2 text-2xl font-extrabold">Review match</h2>
             <dl className="mt-5 divide-y rounded-xl border px-4">
-              <div className="flex justify-between gap-4 py-3"><dt className="text-sm text-slate-500">Course</dt><dd className="text-right font-bold">{course?.name ?? "Unknown course"}</dd></div>
-              <div className="flex justify-between gap-4 py-3"><dt className="text-sm text-slate-500">Date</dt><dd className="text-right font-bold">{formatMatchDate(value.date, "MMMM d, yyyy")}</dd></div>
-              <div className="flex justify-between gap-4 py-3"><dt className="text-sm text-slate-500">Format</dt><dd className="text-right font-bold">{value.holes} holes · {value.teamSize}v{value.teamSize}</dd></div>
-              <div className="flex justify-between gap-4 py-3"><dt className="text-sm text-slate-500">Team 1</dt><dd className="text-right font-bold">{value.team1PlayerIds.map(playerName).join(" + ")}</dd></div>
-              <div className="flex justify-between gap-4 py-3"><dt className="text-sm text-slate-500">Team 2</dt><dd className="text-right font-bold">{value.team2PlayerIds.map(playerName).join(" + ")}</dd></div>
-              <div className="flex justify-between gap-4 py-3"><dt className="text-sm text-slate-500">Result</dt><dd className="text-right font-bold">{value.team1Result === "PUSH" ? "Push" : value.team1Result === "WIN" ? "Team 1 wins" : "Team 2 wins"} · {scoreLabel(value)}</dd></div>
+              <div className="flex justify-between gap-4 py-3"><dt className="shrink-0 text-sm text-slate-500">Course</dt><dd className="min-w-0 break-words text-right font-bold">{course?.name ?? "Unknown course"}</dd></div>
+              <div className="flex justify-between gap-4 py-3"><dt className="shrink-0 text-sm text-slate-500">Date</dt><dd className="min-w-0 break-words text-right font-bold">{formatMatchDate(value.date, "MMMM d, yyyy")}</dd></div>
+              <div className="flex justify-between gap-4 py-3"><dt className="shrink-0 text-sm text-slate-500">Format</dt><dd className="min-w-0 break-words text-right font-bold">{value.holes} holes · {value.teamSize}v{value.teamSize}</dd></div>
+              <div className="flex justify-between gap-4 py-3"><dt className="shrink-0 text-sm text-slate-500">Team 1</dt><dd className="min-w-0 break-words text-right font-bold">{value.team1PlayerIds.map(playerName).join(" + ")}</dd></div>
+              <div className="flex justify-between gap-4 py-3"><dt className="shrink-0 text-sm text-slate-500">Team 2</dt><dd className="min-w-0 break-words text-right font-bold">{value.team2PlayerIds.map(playerName).join(" + ")}</dd></div>
+              <div className="flex justify-between gap-4 py-3"><dt className="shrink-0 text-sm text-slate-500">Result</dt><dd className="min-w-0 break-words text-right font-bold">{value.team1Result === "PUSH" ? "Push" : value.team1Result === "WIN" ? "Team 1 wins" : "Team 2 wins"} · {scoreLabel(value)}</dd></div>
             </dl>
             <p className="mt-4 rounded-xl bg-trophy-100/60 px-4 py-3 text-sm leading-6 text-trophy-700">
               This backend does not expose a safe rating preview. ELO effects will be calculated atomically when the match is saved.
             </p>
-            {submissionError && <p className="mt-4 text-sm font-semibold text-red-700" role="alert">{submissionError}</p>}
+            {submissionError && (
+              <p
+                id="match-submission-error"
+                className="mt-4 text-sm font-semibold text-red-700"
+                role="alert"
+              >
+                {submissionError}
+              </p>
+            )}
           </section>
         )}
 
-        {stepError && <p className="mt-4 text-sm font-semibold text-red-700" role="alert">{stepError}</p>}
+        {stepError && (
+          <p className="mt-4 text-sm font-semibold text-red-700" role="alert">
+            {stepError}
+          </p>
+        )}
         <div className="mt-6 flex items-center justify-between gap-3">
           {step > 1 ? (
             <button className="button-secondary px-3 sm:px-5" type="button" onClick={() => { setStep((current) => current - 1); setStepError(""); }} disabled={isSubmitting}>
@@ -354,7 +363,13 @@ export function MatchForm({
               Continue<ArrowRight aria-hidden="true" size={18} />
             </button>
           ) : (
-            <button className="button-primary px-3 sm:px-5" type="button" onClick={submit} disabled={isSubmitting}>
+            <button
+              className="button-primary px-3 sm:px-5"
+              type="button"
+              onClick={submit}
+              disabled={isSubmitting}
+              aria-describedby={submissionError ? "match-submission-error" : undefined}
+            >
               <Save aria-hidden="true" size={18} />{isSubmitting ? "Saving…" : submitLabel}
             </button>
           )}

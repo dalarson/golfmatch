@@ -1,5 +1,5 @@
 import { Pencil, Plus, Users } from "lucide-react";
-import { useCallback, useState, type FormEvent } from "react";
+import { useCallback, useRef, useState, type FormEvent } from "react";
 import { z } from "zod";
 import { Dialog } from "../components/ui/Dialog";
 import { EmptyState } from "../components/ui/EmptyState";
@@ -9,37 +9,37 @@ import { PageIntro } from "../components/ui/PageIntro";
 import { useAsyncData } from "../hooks/useAsyncData";
 import { getLeaderboard } from "../services/leaderboard";
 import { createPlayer, updatePlayer } from "../services/players";
+import type { LeaderboardEntry } from "../services/schemas";
 import { getServiceErrorMessage } from "../services/shared";
-import type { ViewRow } from "../types/database";
 
 const playerSchema = z.object({
   name: z.string().trim().min(1, "Enter a player name.").max(100, "Use 100 characters or fewer."),
 });
-
-type Player = ViewRow<"leaderboard">;
 
 function PlayerDialog({
   player,
   onClose,
   onSaved,
 }: {
-  player: Player | null;
+  player: LeaderboardEntry | null;
   onClose: () => void;
   onSaved: (message: string) => void;
 }) {
   const [name, setName] = useState(player?.player_name ?? "");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const submissionLock = useRef(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (isSubmitting) return;
+    if (submissionLock.current) return;
     const parsed = playerSchema.safeParse({ name });
     if (!parsed.success) {
       setError(parsed.error.issues[0]?.message ?? "Enter a valid player name.");
       return;
     }
 
+    submissionLock.current = true;
     setIsSubmitting(true);
     setError("");
     try {
@@ -53,6 +53,7 @@ function PlayerDialog({
     } catch (submissionError) {
       setError(getServiceErrorMessage(submissionError, "Unable to save the player."));
       setIsSubmitting(false);
+      submissionLock.current = false;
     }
   }
 
@@ -82,8 +83,10 @@ function PlayerDialog({
           }}
           maxLength={100}
           disabled={isSubmitting}
+          aria-invalid={Boolean(error)}
+          aria-describedby={error ? "player-name-error" : undefined}
         />
-        {error && <p className="mt-3 text-sm font-semibold text-red-700" role="alert">{error}</p>}
+        {error && <p id="player-name-error" className="mt-3 text-sm font-semibold text-red-700" role="alert">{error}</p>}
         <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <button className="button-secondary" type="button" onClick={onClose} disabled={isSubmitting}>
             Cancel
@@ -100,7 +103,7 @@ function PlayerDialog({
 export function AdminPlayersPage() {
   const load = useCallback(() => getLeaderboard(), []);
   const players = useAsyncData(load);
-  const [editingPlayer, setEditingPlayer] = useState<Player | null | undefined>();
+  const [editingPlayer, setEditingPlayer] = useState<LeaderboardEntry | null | undefined>();
   const [feedback, setFeedback] = useState("");
 
   function handleSaved(message: string) {

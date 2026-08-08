@@ -1,5 +1,5 @@
 import { format } from "date-fns";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { MatchForm } from "../components/admin/MatchForm";
 import { EmptyState } from "../components/ui/EmptyState";
@@ -21,8 +21,11 @@ export function AdminNewMatchPage() {
   const options = useAsyncData(load);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submissionError, setSubmissionError] = useState("");
+  const submissionLock = useRef(false);
 
   async function handleSubmit(value: MatchInput) {
+    if (submissionLock.current) return;
+    submissionLock.current = true;
     setIsSubmitting(true);
     setSubmissionError("");
     try {
@@ -34,6 +37,7 @@ export function AdminNewMatchPage() {
     } catch (error) {
       setSubmissionError(getServiceErrorMessage(error, "Unable to record the match."));
       setIsSubmitting(false);
+      submissionLock.current = false;
     }
   }
 

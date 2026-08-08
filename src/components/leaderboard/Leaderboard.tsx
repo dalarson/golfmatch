@@ -1,9 +1,7 @@
 import { ChevronRight, Medal } from "lucide-react";
 import { Link } from "react-router-dom";
 import { cn } from "../../lib/utils";
-import type { ViewRow } from "../../types/database";
-
-type LeaderboardEntry = ViewRow<"leaderboard">;
+import type { LeaderboardEntry } from "../../services/schemas";
 
 function value(value: number | null) {
   return value ?? 0;
@@ -25,7 +23,7 @@ function LeaderboardRow({ player }: { player: LeaderboardEntry }) {
       <Link
         to={`/players/${player.player_id}`}
         className={cn(
-          "group grid min-h-20 grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center gap-3 rounded-2xl border bg-white px-3 py-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-card sm:grid-cols-[3rem_minmax(0,1fr)_8rem_6rem_2rem] sm:px-5",
+          "group grid min-h-20 grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center gap-3 rounded-2xl border bg-white px-3 py-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-card md:grid-cols-[3rem_minmax(0,1fr)_7rem_6rem_5rem_2rem] md:px-5",
           isPodium && podiumStyles[rank as 1 | 2 | 3],
         )}
         aria-label={`${player.player_name ?? "Player"}, rank ${rank || "unavailable"}, ${value(player.elo_rating)} ELO`}
@@ -54,7 +52,7 @@ function LeaderboardRow({ player }: { player: LeaderboardEntry }) {
           <span className="block truncate font-bold text-fairway-950">
             {player.player_name ?? "Unnamed player"}
           </span>
-          <span className="mt-1 block text-xs font-medium text-slate-500 sm:hidden">
+          <span className="mt-1 block text-xs font-medium text-slate-500 md:hidden">
             {value(player.wins)}W · {value(player.losses)}L ·{" "}
             {value(player.pushes)}P · {value(player.matches)} played ·{" "}
             {value(player.win_percentage).toFixed(1)}%
@@ -68,13 +66,13 @@ function LeaderboardRow({ player }: { player: LeaderboardEntry }) {
             ELO
           </span>
         </span>
-        <span className="hidden text-sm font-semibold tabular-nums text-slate-600 sm:block">
+        <span className="hidden text-sm font-semibold tabular-nums text-slate-600 md:block">
           {value(player.wins)}-{value(player.losses)}-{value(player.pushes)}
           <span className="block text-xs font-normal text-slate-500">
             {value(player.matches)} matches
           </span>
         </span>
-        <span className="hidden text-right sm:block">
+        <span className="hidden text-right md:block">
           <strong className="block tabular-nums text-fairway-800">
             {value(player.win_percentage).toFixed(1)}%
           </strong>
@@ -82,7 +80,7 @@ function LeaderboardRow({ player }: { player: LeaderboardEntry }) {
         </span>
         <ChevronRight
           aria-hidden="true"
-          className="hidden text-slate-400 transition group-hover:translate-x-0.5 sm:block"
+          className="hidden text-slate-400 transition group-hover:translate-x-0.5 md:block"
           size={20}
         />
       </Link>
@@ -104,12 +102,13 @@ export function Leaderboard({ players }: { players: LeaderboardEntry[] }) {
           {players.length} {players.length === 1 ? "player" : "players"}
         </span>
       </div>
-      <div className="mb-2 hidden grid-cols-[3rem_minmax(0,1fr)_8rem_6rem_2rem] gap-3 px-5 text-xs font-bold uppercase tracking-wider text-slate-500 sm:grid">
+      <div className="mb-2 hidden grid-cols-[3rem_minmax(0,1fr)_7rem_6rem_5rem_2rem] gap-3 px-5 text-xs font-bold uppercase tracking-wider text-slate-500 md:grid">
         <span>Rank</span>
         <span>Player</span>
         <span className="text-right">ELO</span>
         <span>Record</span>
         <span className="text-right">Win %</span>
+        <span aria-hidden="true" />
       </div>
       <ol className="space-y-2">
         {players.map((player, index) => (

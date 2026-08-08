@@ -6,7 +6,7 @@ import { ErrorState } from "../components/ui/ErrorState";
 import { LoadingState } from "../components/ui/LoadingState";
 import { useAsyncData } from "../hooks/useAsyncData";
 import { teamNames } from "../lib/matches";
-import { cn, formatMatchDate } from "../lib/utils";
+import { cn, formatMatchDate, isUuid } from "../lib/utils";
 import {
   getMatch,
   getMatchRatings,
@@ -99,7 +99,7 @@ export function MatchDetailPage() {
   const location = useLocation();
   const navigationState = location.state as { message?: string } | null;
   const load = useCallback(async () => {
-    if (!matchId) return { match: null, ratings: [] };
+    if (!isUuid(matchId)) return { match: null, ratings: [] };
     const [match, ratings] = await Promise.all([
       getMatch(matchId),
       getMatchRatings(matchId),

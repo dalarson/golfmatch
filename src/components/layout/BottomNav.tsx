@@ -1,4 +1,4 @@
-import { History, LayoutDashboard, Shield, Trophy, Users } from "lucide-react";
+import { History, Shield, Trophy, Users } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { useAdminAuth } from "../../auth/AdminAuthContext";
 import { cn } from "../../lib/utils";
@@ -11,12 +11,15 @@ const publicItems = [
 
 export function BottomNav() {
   const { isAuthenticated } = useAdminAuth();
-  const items = isAuthenticated
-    ? [
-        ...publicItems,
-        { to: "/admin", label: "Admin", icon: Shield, end: false },
-      ]
-    : publicItems;
+  const items = [
+    ...publicItems,
+    {
+      to: isAuthenticated ? "/admin" : "/admin/login",
+      label: "Admin",
+      icon: Shield,
+      end: false,
+    },
+  ];
 
   return (
     <nav
@@ -42,15 +45,6 @@ export function BottomNav() {
             <span>{label}</span>
           </NavLink>
         ))}
-        {!isAuthenticated && (
-          <NavLink
-            to="/admin/login"
-            className="hidden min-h-11 items-center gap-2 rounded-xl px-3 text-sm font-bold text-slate-500 transition hover:text-fairway-800 md:ml-auto md:flex"
-          >
-            <LayoutDashboard aria-hidden="true" size={20} />
-            Admin access
-          </NavLink>
-        )}
       </div>
     </nav>
   );

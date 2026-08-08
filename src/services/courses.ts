@@ -1,11 +1,12 @@
+import { z } from "zod";
 import { supabase } from "../lib/supabase";
+import { courseSchema, uuidSchema, type Course } from "./schemas";
 import { throwIfError } from "./shared";
-import type { TableRow } from "../types/database";
 
-export async function getCourses(): Promise<TableRow<"courses">[]> {
+export async function getCourses(): Promise<Course[]> {
   const { data, error } = await supabase.from("courses").select("*").order("name");
   throwIfError("Unable to load courses", error);
-  return data;
+  return z.array(courseSchema).parse(data);
 }
 
 export async function createCourse(name: string, location: string): Promise<string> {
@@ -14,29 +15,19 @@ export async function createCourse(name: string, location: string): Promise<stri
     p_location: location,
   });
   throwIfError("Unable to create course", error);
-  return data;
+  return uuidSchema.parse(data);
 }
 
 export async function updateCourse(
   courseId: string,
   name: string,
   location: string,
-): Promise<TableRow<"courses">> {
+): Promise<Course> {
   const { data, error } = await supabase.rpc("update_course", {
     p_course_id: courseId,
     p_name: name,
     p_location: location,
   });
   throwIfError("Unable to update course", error);
-  return data;
-}
-
-export async function getEloSettings(): Promise<TableRow<"elo_settings">> {
-  const { data, error } = await supabase
-    .from("elo_settings")
-    .select("*")
-    .eq("id", true)
-    .single();
-  throwIfError("Unable to load ELO settings", error);
-  return data;
+  return courseSchema.parse(data);
 }

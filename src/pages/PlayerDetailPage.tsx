@@ -12,6 +12,7 @@ import { EmptyState } from "../components/ui/EmptyState";
 import { ErrorState } from "../components/ui/ErrorState";
 import { LoadingState } from "../components/ui/LoadingState";
 import { useAsyncData } from "../hooks/useAsyncData";
+import { isUuid } from "../lib/utils";
 import { getCourses } from "../services/courses";
 import {
   getPlayerCourseRecords,
@@ -308,7 +309,7 @@ function PlayerAnalyticsContent({
 
 export function PlayerDetailPage() {
   const { playerId } = useParams();
-  if (!playerId) {
+  if (!isUuid(playerId)) {
     return (
       <EmptyState
         title="Player not found"

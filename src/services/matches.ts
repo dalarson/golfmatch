@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { supabase } from "../lib/supabase";
+import { timestampSchema, uuidSchema } from "./schemas";
 import { throwIfError } from "./shared";
 import type {
   Database,
@@ -8,23 +9,52 @@ import type {
 } from "../types/database";
 
 const matchPlayerSchema = z.object({
-  id: z.string().uuid(),
+  id: uuidSchema,
   name: z.string(),
 });
 
 const matchSummarySchema = z.object({
-  match_id: z.string().uuid().nullable(),
-  date: z.string().nullable(),
-  created_at: z.string(),
-  course_id: z.string().uuid().nullable(),
-  course_name: z.string().nullable(),
-  holes: z.number().nullable(),
-  team_size: z.number().nullable(),
-  score: z.string().nullable(),
-  team_1_result: z.enum(["WIN", "LOSS", "PUSH"]).nullable(),
-  team_2_result: z.enum(["WIN", "LOSS", "PUSH"]).nullable(),
+  match_id: uuidSchema,
+  date: z.string().date(),
+  created_at: timestampSchema,
+  course_id: uuidSchema,
+  course_name: z.string().min(1),
+  holes: z.union([z.literal(9), z.literal(18)]),
+  team_size: z.union([z.literal(1), z.literal(2)]),
+  score: z.string().min(1),
+  team_1_result: z.enum(["WIN", "LOSS", "PUSH"]),
+  team_2_result: z.enum(["WIN", "LOSS", "PUSH"]),
   team_1_players: z.array(matchPlayerSchema),
   team_2_players: z.array(matchPlayerSchema),
+});
+
+const editableMatchSchema = z.object({
+  id: uuidSchema,
+  date: z.string().date(),
+  course_id: uuidSchema,
+  holes: z.union([z.literal(9), z.literal(18)]),
+  team_size: z.union([z.literal(1), z.literal(2)]),
+  score_type: z.enum(["UP", "HOLES_UP", "PUSH"]),
+  score_value: z.number().int().nullable(),
+  holes_remaining: z.number().int().nullable(),
+});
+
+const matchTeamSchema = z.object({
+  id: uuidSchema,
+  team_number: z.union([z.literal(1), z.literal(2)]),
+  result: z.enum(["WIN", "LOSS", "PUSH"]),
+});
+
+const matchTeamPlayerSchema = z.object({
+  match_team_id: uuidSchema,
+  player_id: uuidSchema,
+});
+
+const matchRatingSchema = z.object({
+  player_id: uuidSchema,
+  rating_before: z.number().int(),
+  rating_after: z.number().int(),
+  rating_change: z.number().int(),
 });
 
 export type MatchSummary = z.infer<typeof matchSummarySchema>;
@@ -177,32 +207,29 @@ export async function getEditableMatch(
   throwIfError("Unable to load match players", playersResult.error);
   if (!matchResult.data) return null;
 
-  const team1 = teamsResult.data.find((team) => team.team_number === 1);
-  const team2 = teamsResult.data.find((team) => team.team_number === 2);
+  const match = editableMatchSchema.parse(matchResult.data);
+  const teams = z.array(matchTeamSchema).parse(teamsResult.data);
+  const players = z.array(matchTeamPlayerSchema).parse(playersResult.data);
+  const team1 = teams.find((team) => team.team_number === 1);
+  const team2 = teams.find((team) => team.team_number === 2);
   if (!team1 || !team2) {
     throw new Error("The saved match does not contain two complete teams.");
   }
 
   const teamPlayerIds = (teamId: string) =>
-    playersResult.data
+    players
       .filter((player) => player.match_team_id === teamId)
       .map((player) => player.player_id);
-  const holes = matchResult.data.holes;
-  const teamSize = matchResult.data.team_size;
-  if ((holes !== 9 && holes !== 18) || (teamSize !== 1 && teamSize !== 2)) {
-    throw new Error("The saved match has an unsupported format.");
-  }
-
   return {
-    id: matchResult.data.id,
+    id: match.id,
     input: {
-      date: matchResult.data.date,
-      courseId: matchResult.data.course_id,
-      holes,
-      teamSize,
-      scoreType: matchResult.data.score_type,
-      scoreValue: matchResult.data.score_value,
-      holesRemaining: matchResult.data.holes_remaining,
+      date: match.date,
+      courseId: match.course_id,
+      holes: match.holes,
+      teamSize: match.team_size,
+      scoreType: match.score_type,
+      scoreValue: match.score_value,
+      holesRemaining: match.holes_remaining,
       team1PlayerIds: teamPlayerIds(team1.id),
       team2PlayerIds: teamPlayerIds(team2.id),
       team1Result: team1.result,
@@ -220,7 +247,7 @@ export async function getMatchRatings(
     .eq("match_id", matchId)
     .order("player_id");
   throwIfError("Unable to load match ratings", error);
-  return data.map((rating) => ({
+  return z.array(matchRatingSchema).parse(data).map((rating) => ({
     playerId: rating.player_id,
     ratingBefore: rating.rating_before,
     ratingAfter: rating.rating_after,
@@ -231,7 +258,7 @@ export async function getMatchRatings(
 export async function recordMatch(input: MatchInput): Promise<string> {
   const { data, error } = await supabase.rpc("record_match", toMatchArgs(input));
   throwIfError("Unable to record match", error);
-  return data;
+  return uuidSchema.parse(data);
 }
 
 export async function updateMatch(
@@ -243,7 +270,7 @@ export async function updateMatch(
     ...toMatchArgs(input),
   });
   throwIfError("Unable to update match", error);
-  return data;
+  return uuidSchema.parse(data);
 }
 
 export async function deleteMatch(matchId: string): Promise<void> {
@@ -251,10 +278,4 @@ export async function deleteMatch(matchId: string): Promise<void> {
     p_match_id: matchId,
   });
   throwIfError("Unable to delete match", error);
-}
-
-export async function recalculateAllElo() {
-  const { data, error } = await supabase.rpc("recalculate_all_elo");
-  throwIfError("Unable to recalculate ELO", error);
-  return data[0] ?? null;
 }

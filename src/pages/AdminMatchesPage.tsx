@@ -1,5 +1,5 @@
 import { ChevronLeft, ChevronRight, ExternalLink, Pencil, Plus, Trash2 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Dialog } from "../components/ui/Dialog";
 import { EmptyState } from "../components/ui/EmptyState";
@@ -25,9 +25,11 @@ function DeleteMatchDialog({
 }) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState("");
+  const deletionLock = useRef(false);
 
   async function handleDelete() {
-    if (!match.match_id || isDeleting) return;
+    if (!match.match_id || deletionLock.current) return;
+    deletionLock.current = true;
     setIsDeleting(true);
     setError("");
     try {
@@ -36,6 +38,7 @@ function DeleteMatchDialog({
     } catch (deletionError) {
       setError(getServiceErrorMessage(deletionError, "Unable to delete the match."));
       setIsDeleting(false);
+      deletionLock.current = false;
     }
   }
 

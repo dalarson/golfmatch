@@ -31,6 +31,18 @@ export function getServiceErrorMessage(
     return "That value is already in use. Choose a different one.";
   }
 
+  if (error.code === "23503") {
+    return "A referenced player, course, or match is no longer available. Refresh and try again.";
+  }
+
+  if (error.code === "42501") {
+    return "This deployment does not allow that operation. Check the Supabase grants and try again.";
+  }
+
   const message = error.message.replace(/^[^:]+:\s*/, "").trim();
-  return message || fallback;
+  if (error.code === "22023" || error.code === "P0002") {
+    return message || fallback;
+  }
+
+  return fallback;
 }

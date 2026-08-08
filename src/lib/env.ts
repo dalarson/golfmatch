@@ -9,13 +9,17 @@ const publicEnvSchema = z.object({
 
 const parsedPublicEnv = publicEnvSchema.safeParse(import.meta.env);
 
-if (!parsedPublicEnv.success) {
-  const details = parsedPublicEnv.error.issues
+export const frontendConfigurationError = parsedPublicEnv.success
+  ? null
+  : parsedPublicEnv.error.issues
     .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
     .join("\n");
-  throw new Error(`Invalid frontend environment configuration:\n${details}`);
-}
 
-export const publicEnv = parsedPublicEnv.data;
+export const publicEnv = parsedPublicEnv.success
+  ? parsedPublicEnv.data
+  : {
+      VITE_SUPABASE_URL: "https://invalid.local",
+      VITE_SUPABASE_ANON_KEY: "invalid-configuration",
+    };
 
 export const adminAccessCode = import.meta.env.VITE_ADMIN_ACCESS_CODE?.trim() ?? "";

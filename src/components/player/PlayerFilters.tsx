@@ -4,11 +4,11 @@ import type {
   PlayerPartnership,
   PlayerStatsFilters,
 } from "../../services/statistics";
-import type { TableRow } from "../../types/database";
+import type { Course } from "../../services/schemas";
 
 interface PlayerFiltersProps {
   filters: PlayerStatsFilters;
-  courses: TableRow<"courses">[];
+  courses: Course[];
   partnerships: PlayerPartnership[];
   opponents: PlayerHeadToHead[];
   activeLabels: string[];

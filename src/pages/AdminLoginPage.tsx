@@ -16,7 +16,8 @@ export function AdminLoginPage() {
 
   const state = location.state as LoginLocationState | null;
   const destination =
-    state?.from?.startsWith("/admin") && state.from !== "/admin/login"
+    (state?.from === "/admin" || state?.from?.startsWith("/admin/")) &&
+    state.from !== "/admin/login"
       ? state.from
       : "/admin";
 
@@ -46,8 +47,9 @@ export function AdminLoginPage() {
       />
       <form className="card" onSubmit={handleSubmit}>
         {!isConfigured && (
-          <p className="mb-4 rounded-xl bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900" role="status">
-            Admin access is disabled because <code>VITE_ADMIN_ACCESS_CODE</code> is not configured for this deployment.
+          <p className="mb-4 rounded-xl bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900" role="alert">
+            Admin access is disabled. Set <code>VITE_ADMIN_ACCESS_CODE</code>{" "}
+            and rebuild this deployment.
           </p>
         )}
         <label className="text-sm font-bold" htmlFor="admin-code">
@@ -65,9 +67,14 @@ export function AdminLoginPage() {
           autoComplete="current-password"
           disabled={!isConfigured}
           required
+          aria-invalid={Boolean(error)}
+          aria-describedby={error ? "admin-code-error" : "admin-code-help"}
         />
+        <p id="admin-code-help" className="mt-2 text-xs leading-5 text-slate-500">
+          The code only hides admin screens; it does not secure database RPCs.
+        </p>
         {error && (
-          <p className="mt-3 text-sm font-medium text-red-700" role="alert">
+          <p id="admin-code-error" className="mt-3 text-sm font-medium text-red-700" role="alert">
             {error}
           </p>
         )}

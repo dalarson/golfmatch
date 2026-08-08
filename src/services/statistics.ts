@@ -1,8 +1,7 @@
 import { z } from "zod";
 import { supabase } from "../lib/supabase";
+import { uuidSchema } from "./schemas";
 import { throwIfError } from "./shared";
-
-const uuidSchema = z.string().uuid();
 
 const playerOverviewSchema = z.object({
   player_id: uuidSchema,
@@ -36,7 +35,7 @@ const eloHistorySchema = z.object({
   rating_before: z.number().int(),
   rating_after: z.number().int(),
   rating_change: z.number().int(),
-  created_at: z.string(),
+  created_at: z.string().datetime({ offset: true }),
 });
 
 const courseRecordSchema = z.object({
@@ -90,7 +89,7 @@ const playerHistorySchema = z.object({
   elo_before: z.number().int(),
   elo_after: z.number().int(),
   elo_change: z.number().int(),
-  created_at: z.string(),
+  created_at: z.string().datetime({ offset: true }),
 });
 
 export type PlayerOverview = z.infer<typeof playerOverviewSchema>;

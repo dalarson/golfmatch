@@ -1,5 +1,5 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { MatchCard } from "../components/matches/MatchCard";
 import { EmptyState } from "../components/ui/EmptyState";
@@ -31,6 +31,19 @@ export function MatchesPage() {
     history.status === "success"
       ? Math.max(1, Math.ceil(history.data.total / PAGE_SIZE))
       : 1;
+
+  useEffect(() => {
+    if (
+      history.status === "success" &&
+      history.data.total > 0 &&
+      page > totalPages
+    ) {
+      setSearchParams(
+        totalPages === 1 ? {} : { page: String(totalPages) },
+        { replace: true },
+      );
+    }
+  }, [history, page, setSearchParams, totalPages]);
 
   return (
     <>
@@ -119,4 +132,3 @@ export function MatchesPage() {
     </>
   );
 }
-
