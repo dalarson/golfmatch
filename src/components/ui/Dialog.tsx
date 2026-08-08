@@ -40,6 +40,9 @@ export function Dialog({
         event.preventDefault();
         requestClose();
       }}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) requestClose();
+      }}
     >
       <div className="flex items-start justify-between gap-4 border-b px-5 py-4">
         <div>
