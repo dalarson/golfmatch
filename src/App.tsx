@@ -4,7 +4,11 @@ import { AppShell } from "./components/layout/AppShell";
 import { AdminLoginPage } from "./pages/AdminLoginPage";
 import { AdminPage } from "./pages/AdminPage";
 import { HomePage } from "./pages/HomePage";
+import { MatchDetailPage } from "./pages/MatchDetailPage";
+import { MatchesPage } from "./pages/MatchesPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
+import { PlayerComingSoonPage } from "./pages/PlayerComingSoonPage";
+import { PlayersPage } from "./pages/PlayersPage";
 import { PlaceholderPage } from "./pages/PlaceholderPage";
 
 export function App() {
@@ -12,46 +16,10 @@ export function App() {
     <Routes>
       <Route element={<AppShell />}>
         <Route index element={<HomePage />} />
-        <Route
-          path="players"
-          element={
-            <PlaceholderPage
-              eyebrow="Players"
-              title="Player directory"
-              description="Browse the field and open individual performance profiles."
-            />
-          }
-        />
-        <Route
-          path="players/:playerId"
-          element={
-            <PlaceholderPage
-              eyebrow="Player profile"
-              title="Player performance"
-              description="Career overview, ELO history, and server-filtered statistics."
-            />
-          }
-        />
-        <Route
-          path="matches"
-          element={
-            <PlaceholderPage
-              eyebrow="History"
-              title="Match history"
-              description="Reverse-chronological matches with database-backed filters."
-            />
-          }
-        />
-        <Route
-          path="matches/:matchId"
-          element={
-            <PlaceholderPage
-              eyebrow="Match detail"
-              title="Match result"
-              description="Teams, score, course, and authoritative ELO changes."
-            />
-          }
-        />
+        <Route path="players" element={<PlayersPage />} />
+        <Route path="players/:playerId" element={<PlayerComingSoonPage />} />
+        <Route path="matches" element={<MatchesPage />} />
+        <Route path="matches/:matchId" element={<MatchDetailPage />} />
         <Route path="admin/login" element={<AdminLoginPage />} />
         <Route element={<AdminGuard />}>
           <Route path="admin" element={<AdminPage />} />

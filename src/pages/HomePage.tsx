@@ -1,29 +1,42 @@
-import { Trophy } from "lucide-react";
+import { useCallback } from "react";
+import { Leaderboard } from "../components/leaderboard/Leaderboard";
+import { EmptyState } from "../components/ui/EmptyState";
+import { ErrorState } from "../components/ui/ErrorState";
+import { LoadingState } from "../components/ui/LoadingState";
 import { PageIntro } from "../components/ui/PageIntro";
+import { useAsyncData } from "../hooks/useAsyncData";
+import { getLeaderboard } from "../services/leaderboard";
 
 export function HomePage() {
+  const load = useCallback(() => getLeaderboard(), []);
+  const leaderboard = useAsyncData(load);
+
   return (
     <>
       <PageIntro
         eyebrow="Current rankings"
-        title="The leaderboard starts here."
-        description="Live ELO standings and career records will be powered by the database leaderboard view."
+        title="The field. Ranked."
+        description="Live ELO standings and career records from every match played."
       />
-      <section className="overflow-hidden rounded-card bg-fairway-900 p-6 text-white shadow-card sm:p-8">
-        <div className="grid size-12 place-items-center rounded-2xl bg-trophy-400 text-fairway-950">
-          <Trophy aria-hidden="true" />
-        </div>
-        <p className="mt-8 text-sm font-bold uppercase tracking-[0.16em] text-trophy-400">
-          Fairway standings
-        </p>
-        <h2 className="mt-2 max-w-lg text-2xl font-extrabold sm:text-3xl">
-          A tournament-style home for every match.
-        </h2>
-        <p className="mt-3 max-w-xl text-sm leading-6 text-fairway-100">
-          The visual foundation is ready for leaderboard data without moving ELO
-          or career calculations into the browser.
-        </p>
-      </section>
+      {leaderboard.status === "loading" && (
+        <LoadingState label="Loading leaderboard" rows={6} />
+      )}
+      {leaderboard.status === "error" && (
+        <ErrorState
+          title="Unable to load rankings"
+          message="The current standings could not be loaded. Check your connection and try again."
+          onRetry={leaderboard.retry}
+        />
+      )}
+      {leaderboard.status === "success" && leaderboard.data.length === 0 && (
+        <EmptyState
+          title="No rankings yet"
+          description="Add players to start building the Fairway leaderboard."
+        />
+      )}
+      {leaderboard.status === "success" && leaderboard.data.length > 0 && (
+        <Leaderboard players={leaderboard.data} />
+      )}
     </>
   );
 }

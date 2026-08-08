@@ -29,6 +29,18 @@ const matchSummarySchema = z.object({
 
 export type MatchSummary = z.infer<typeof matchSummarySchema>;
 
+export interface MatchHistoryPage {
+  matches: MatchSummary[];
+  total: number;
+}
+
+export interface MatchRating {
+  playerId: string;
+  ratingBefore: number;
+  ratingAfter: number;
+  ratingChange: number;
+}
+
 export interface MatchFilters {
   courseId?: string;
   holes?: 9 | 18;
@@ -97,6 +109,31 @@ export async function getMatchHistory(
   );
 }
 
+export async function getMatchHistoryPage(
+  page: number,
+  pageSize: number,
+): Promise<MatchHistoryPage> {
+  const from = (page - 1) * pageSize;
+  const { data, error, count } = await supabase
+    .from("match_summary")
+    .select("*", { count: "exact" })
+    .order("date", { ascending: false })
+    .order("match_id", { ascending: false })
+    .range(from, from + pageSize - 1);
+  throwIfError("Unable to load match history", error);
+
+  return {
+    matches: data.map((match) =>
+      matchSummarySchema.parse({
+        ...match,
+        team_1_players: match.team_1_players ?? [],
+        team_2_players: match.team_2_players ?? [],
+      }),
+    ),
+    total: count ?? 0,
+  };
+}
+
 export async function getMatch(matchId: string): Promise<MatchSummary | null> {
   const { data, error } = await supabase
     .from("match_summary")
@@ -110,6 +147,23 @@ export async function getMatch(matchId: string): Promise<MatchSummary | null> {
     team_1_players: data.team_1_players ?? [],
     team_2_players: data.team_2_players ?? [],
   });
+}
+
+export async function getMatchRatings(
+  matchId: string,
+): Promise<MatchRating[]> {
+  const { data, error } = await supabase
+    .from("player_ratings")
+    .select("player_id, rating_before, rating_after, rating_change")
+    .eq("match_id", matchId)
+    .order("player_id");
+  throwIfError("Unable to load match ratings", error);
+  return data.map((rating) => ({
+    playerId: rating.player_id,
+    ratingBefore: rating.rating_before,
+    ratingAfter: rating.rating_after,
+    ratingChange: rating.rating_change,
+  }));
 }
 
 export async function getPlayerMatchHistory(
