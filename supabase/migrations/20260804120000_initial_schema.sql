@@ -1,51 +1,11 @@
-create schema if not exists extensions;
-create extension if not exists pgcrypto with schema extensions;
-
-do $$
-begin
-  if to_regtype('public.match_result') is null then
-    create type public.match_result as enum ('WIN', 'LOSS', 'PUSH');
-  elsif not exists (
-    select 1
-    from pg_catalog.pg_type t
-    join pg_catalog.pg_namespace n on n.oid = t.typnamespace
-    where n.nspname = 'public'
-      and t.typname = 'match_result'
-      and t.typtype = 'e'
-      and (
-        select array_agg(e.enumlabel order by e.enumsortorder)
-        from pg_catalog.pg_enum e
-        where e.enumtypid = t.oid
-      ) = array['WIN', 'LOSS', 'PUSH']::name[]
-  ) then
-    raise exception 'public.match_result exists but is not the expected enum (WIN, LOSS, PUSH)';
-  end if;
-
-  if to_regtype('public.score_type') is null then
-    create type public.score_type as enum ('UP', 'HOLES_UP', 'PUSH');
-  elsif not exists (
-    select 1
-    from pg_catalog.pg_type t
-    join pg_catalog.pg_namespace n on n.oid = t.typnamespace
-    where n.nspname = 'public'
-      and t.typname = 'score_type'
-      and t.typtype = 'e'
-      and (
-        select array_agg(e.enumlabel order by e.enumsortorder)
-        from pg_catalog.pg_enum e
-        where e.enumtypid = t.oid
-      ) = array['UP', 'HOLES_UP', 'PUSH']::name[]
-  ) then
-    raise exception 'public.score_type exists but is not the expected enum (UP, HOLES_UP, PUSH)';
-  end if;
-end;
-$$;
-
 do $$
 declare
   v_expected record;
   v_actual_count integer;
+  v_actual_definition text;
 begin
+  perform pg_catalog.set_config('search_path', 'pg_catalog, public', true);
+
   for v_expected in
     select *
     from (values
@@ -143,6 +103,211 @@ begin
       end if;
     end if;
   end loop;
+
+  for v_expected in
+    select *
+    from (values
+      ('elo_settings', 'id', 'true'),
+      ('elo_settings', 'initial_rating', '1500'),
+      ('elo_settings', 'k_factor', '32'),
+      ('elo_settings', 'updated_at', 'now()'),
+      ('players', 'id', 'extensions.gen_random_uuid()'),
+      ('players', 'name', null),
+      ('players', 'elo_rating', '1500'),
+      ('players', 'elo_peak', '1500'),
+      ('players', 'created_at', 'now()'),
+      ('players', 'updated_at', 'now()'),
+      ('courses', 'id', 'extensions.gen_random_uuid()'),
+      ('courses', 'name', null),
+      ('courses', 'location', null),
+      ('courses', 'created_at', 'now()'),
+      ('courses', 'updated_at', 'now()'),
+      ('matches', 'id', 'extensions.gen_random_uuid()'),
+      ('matches', 'date', 'CURRENT_DATE'),
+      ('matches', 'course_id', null),
+      ('matches', 'holes', null),
+      ('matches', 'team_size', null),
+      ('matches', 'score_type', null),
+      ('matches', 'score_value', null),
+      ('matches', 'holes_remaining', null),
+      ('matches', 'created_at', 'now()'),
+      ('matches', 'updated_at', 'now()'),
+      ('match_teams', 'id', 'extensions.gen_random_uuid()'),
+      ('match_teams', 'match_id', null),
+      ('match_teams', 'team_number', null),
+      ('match_teams', 'result', null),
+      ('match_teams', 'created_at', 'now()'),
+      ('match_team_players', 'id', 'extensions.gen_random_uuid()'),
+      ('match_team_players', 'match_team_id', null),
+      ('match_team_players', 'match_id', null),
+      ('match_team_players', 'player_id', null),
+      ('match_team_players', 'created_at', 'now()'),
+      ('player_ratings', 'id', 'extensions.gen_random_uuid()'),
+      ('player_ratings', 'player_id', null),
+      ('player_ratings', 'match_id', null),
+      ('player_ratings', 'match_team_id', null),
+      ('player_ratings', 'rating_before', null),
+      ('player_ratings', 'rating_after', null),
+      ('player_ratings', 'rating_change', null),
+      ('player_ratings', 'team_rating', null),
+      ('player_ratings', 'opponent_team_rating', null),
+      ('player_ratings', 'created_at', 'now()')
+    ) expected(table_name, column_name, default_definition)
+  loop
+    if to_regclass(format('public.%I', v_expected.table_name)) is not null then
+      select pg_catalog.pg_get_expr(d.adbin, d.adrelid)
+      into v_actual_definition
+      from pg_catalog.pg_attribute a
+      left join pg_catalog.pg_attrdef d
+        on d.adrelid = a.attrelid and d.adnum = a.attnum
+      where a.attrelid = format('public.%I', v_expected.table_name)::regclass
+        and a.attname = v_expected.column_name
+        and a.attnum > 0
+        and not a.attisdropped;
+
+      if v_actual_definition is distinct from v_expected.default_definition then
+        raise exception
+          'public.%.% has incompatible default %. Expected %.',
+          v_expected.table_name,
+          v_expected.column_name,
+          coalesce(v_actual_definition, 'NO DEFAULT'),
+          coalesce(v_expected.default_definition, 'NO DEFAULT');
+      end if;
+    end if;
+  end loop;
+
+  for v_expected in
+    select *
+    from (values
+      ('elo_settings', 'elo_settings_pkey', 'PRIMARY KEY (id)'),
+      ('elo_settings', 'elo_settings_id_check', 'CHECK (id)'),
+      ('elo_settings', 'elo_settings_initial_rating_check', 'CHECK ((initial_rating > 0))'),
+      ('elo_settings', 'elo_settings_k_factor_check', 'CHECK ((k_factor > 0))'),
+      ('players', 'players_pkey', 'PRIMARY KEY (id)'),
+      ('players', 'players_name_check', 'CHECK ((btrim(name) <> ''''::text))'),
+      ('players', 'players_elo_rating_check', 'CHECK ((elo_rating > 0))'),
+      ('players', 'players_check', 'CHECK ((elo_peak >= elo_rating))'),
+      ('courses', 'courses_pkey', 'PRIMARY KEY (id)'),
+      ('courses', 'courses_name_check', 'CHECK ((btrim(name) <> ''''::text))'),
+      ('courses', 'courses_location_check', 'CHECK ((btrim(location) <> ''''::text))'),
+      ('matches', 'matches_pkey', 'PRIMARY KEY (id)'),
+      ('matches', 'matches_course_id_fkey', 'FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE RESTRICT'),
+      ('matches', 'matches_holes_check', 'CHECK ((holes = ANY (ARRAY[9, 18])))'),
+      ('matches', 'matches_team_size_check', 'CHECK ((team_size = ANY (ARRAY[1, 2])))'),
+      ('matches', 'matches_score_representation_check',
+       'CHECK ((((score_type = ''PUSH''::score_type) AND (score_value IS NULL) AND (holes_remaining IS NULL)) OR ((score_type = ''UP''::score_type) AND (score_value IS NOT NULL) AND (score_value > 0) AND (score_value <= holes) AND (holes_remaining IS NULL)) OR ((score_type = ''HOLES_UP''::score_type) AND (score_value IS NOT NULL) AND (holes_remaining IS NOT NULL) AND (score_value > 0) AND (holes_remaining > 0) AND (score_value > holes_remaining) AND (score_value <= holes) AND (holes_remaining < holes))))'),
+      ('match_teams', 'match_teams_pkey', 'PRIMARY KEY (id)'),
+      ('match_teams', 'match_teams_match_id_fkey', 'FOREIGN KEY (match_id) REFERENCES matches(id) ON DELETE CASCADE'),
+      ('match_teams', 'match_teams_team_number_check', 'CHECK ((team_number = ANY (ARRAY[1, 2])))'),
+      ('match_teams', 'match_teams_match_id_team_number_key', 'UNIQUE (match_id, team_number)'),
+      ('match_teams', 'match_teams_id_match_id_key', 'UNIQUE (id, match_id)'),
+      ('match_team_players', 'match_team_players_pkey', 'PRIMARY KEY (id)'),
+      ('match_team_players', 'match_team_players_match_team_id_fkey', 'FOREIGN KEY (match_team_id) REFERENCES match_teams(id) ON DELETE CASCADE'),
+      ('match_team_players', 'match_team_players_match_id_fkey', 'FOREIGN KEY (match_id) REFERENCES matches(id) ON DELETE CASCADE'),
+      ('match_team_players', 'match_team_players_player_id_fkey', 'FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE RESTRICT'),
+      ('match_team_players', 'match_team_players_match_team_id_player_id_key', 'UNIQUE (match_team_id, player_id)'),
+      ('match_team_players', 'match_team_players_match_id_player_id_key', 'UNIQUE (match_id, player_id)'),
+      ('match_team_players', 'match_team_players_match_team_id_match_id_fkey',
+       'FOREIGN KEY (match_team_id, match_id) REFERENCES match_teams(id, match_id) ON DELETE CASCADE'),
+      ('player_ratings', 'player_ratings_pkey', 'PRIMARY KEY (id)'),
+      ('player_ratings', 'player_ratings_player_id_fkey', 'FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE'),
+      ('player_ratings', 'player_ratings_match_id_fkey', 'FOREIGN KEY (match_id) REFERENCES matches(id) ON DELETE CASCADE'),
+      ('player_ratings', 'player_ratings_match_team_id_fkey', 'FOREIGN KEY (match_team_id) REFERENCES match_teams(id) ON DELETE CASCADE'),
+      ('player_ratings', 'player_ratings_rating_before_check', 'CHECK ((rating_before > 0))'),
+      ('player_ratings', 'player_ratings_rating_after_check', 'CHECK ((rating_after > 0))'),
+      ('player_ratings', 'player_ratings_match_id_player_id_key', 'UNIQUE (match_id, player_id)'),
+      ('player_ratings', 'player_ratings_match_team_id_match_id_fkey',
+       'FOREIGN KEY (match_team_id, match_id) REFERENCES match_teams(id, match_id) ON DELETE CASCADE'),
+      ('player_ratings', 'player_ratings_check', 'CHECK ((rating_after = (rating_before + rating_change)))')
+    ) expected(table_name, constraint_name, constraint_definition)
+  loop
+    if to_regclass(format('public.%I', v_expected.table_name)) is not null then
+      select pg_catalog.pg_get_constraintdef(c.oid)
+      into v_actual_definition
+      from pg_catalog.pg_constraint c
+      where c.conrelid = format('public.%I', v_expected.table_name)::regclass
+        and c.conname = v_expected.constraint_name
+        and c.convalidated;
+
+      if v_actual_definition is distinct from v_expected.constraint_definition then
+        raise exception
+          'public.% constraint % has incompatible definition %. Expected %.',
+          v_expected.table_name,
+          v_expected.constraint_name,
+          coalesce(v_actual_definition, 'MISSING OR NOT VALID'),
+          v_expected.constraint_definition;
+      end if;
+    end if;
+  end loop;
+
+  for v_expected in
+    select *
+    from (values
+      ('elo_settings', 4),
+      ('players', 4),
+      ('courses', 3),
+      ('matches', 5),
+      ('match_teams', 5),
+      ('match_team_players', 7),
+      ('player_ratings', 9)
+    ) expected(table_name, constraint_count)
+  loop
+    if to_regclass(format('public.%I', v_expected.table_name)) is not null then
+      select count(*) into v_actual_count
+      from pg_catalog.pg_constraint c
+      where c.conrelid = format('public.%I', v_expected.table_name)::regclass
+        and c.contype <> 't';
+
+      if v_actual_count <> v_expected.constraint_count then
+        raise exception
+          'public.% has % non-trigger constraints; expected %. Refusing to continue with an incompatible table.',
+          v_expected.table_name, v_actual_count, v_expected.constraint_count;
+      end if;
+    end if;
+  end loop;
+end;
+$$;
+
+create schema if not exists extensions;
+create extension if not exists pgcrypto with schema extensions;
+
+do $$
+begin
+  if to_regtype('public.match_result') is null then
+    create type public.match_result as enum ('WIN', 'LOSS', 'PUSH');
+  elsif not exists (
+    select 1
+    from pg_catalog.pg_type t
+    join pg_catalog.pg_namespace n on n.oid = t.typnamespace
+    where n.nspname = 'public'
+      and t.typname = 'match_result'
+      and t.typtype = 'e'
+      and (
+        select array_agg(e.enumlabel order by e.enumsortorder)
+        from pg_catalog.pg_enum e
+        where e.enumtypid = t.oid
+      ) = array['WIN', 'LOSS', 'PUSH']::name[]
+  ) then
+    raise exception 'public.match_result exists but is not the expected enum (WIN, LOSS, PUSH)';
+  end if;
+
+  if to_regtype('public.score_type') is null then
+    create type public.score_type as enum ('UP', 'HOLES_UP', 'PUSH');
+  elsif not exists (
+    select 1
+    from pg_catalog.pg_type t
+    join pg_catalog.pg_namespace n on n.oid = t.typnamespace
+    where n.nspname = 'public'
+      and t.typname = 'score_type'
+      and t.typtype = 'e'
+      and (
+        select array_agg(e.enumlabel order by e.enumsortorder)
+        from pg_catalog.pg_enum e
+        where e.enumtypid = t.oid
+      ) = array['UP', 'HOLES_UP', 'PUSH']::name[]
+  ) then
+    raise exception 'public.score_type exists but is not the expected enum (UP, HOLES_UP, PUSH)';
+  end if;
 end;
 $$;
 
