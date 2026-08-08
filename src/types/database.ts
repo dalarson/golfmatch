@@ -356,6 +356,7 @@ export interface Database {
           elo_before: number | null;
           elo_after: number | null;
           elo_change: number | null;
+          created_at: string;
         };
         Relationships: [];
       };
@@ -368,6 +369,7 @@ export interface Database {
           rating_before: number | null;
           rating_after: number | null;
           rating_change: number | null;
+          created_at: string;
         };
         Relationships: [];
       };

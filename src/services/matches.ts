@@ -5,7 +5,6 @@ import type {
   Database,
   MatchResultValue,
   ScoreTypeValue,
-  ViewRow,
 } from "../types/database";
 
 const matchPlayerSchema = z.object({
@@ -167,19 +166,6 @@ export async function getMatchRatings(
     ratingAfter: rating.rating_after,
     ratingChange: rating.rating_change,
   }));
-}
-
-export async function getPlayerMatchHistory(
-  playerId: string,
-): Promise<ViewRow<"player_match_history">[]> {
-  const { data, error } = await supabase
-    .from("player_match_history")
-    .select("*")
-    .eq("player_id", playerId)
-    .order("date", { ascending: false })
-    .order("match_id", { ascending: false });
-  throwIfError("Unable to load player match history", error);
-  return data;
 }
 
 export async function recordMatch(input: MatchInput): Promise<string> {

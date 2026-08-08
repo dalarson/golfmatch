@@ -7,7 +7,7 @@ import { HomePage } from "./pages/HomePage";
 import { MatchDetailPage } from "./pages/MatchDetailPage";
 import { MatchesPage } from "./pages/MatchesPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
-import { PlayerComingSoonPage } from "./pages/PlayerComingSoonPage";
+import { PlayerDetailPage } from "./pages/PlayerDetailPage";
 import { PlayersPage } from "./pages/PlayersPage";
 import { PlaceholderPage } from "./pages/PlaceholderPage";
 
@@ -17,7 +17,7 @@ export function App() {
       <Route element={<AppShell />}>
         <Route index element={<HomePage />} />
         <Route path="players" element={<PlayersPage />} />
-        <Route path="players/:playerId" element={<PlayerComingSoonPage />} />
+        <Route path="players/:playerId" element={<PlayerDetailPage />} />
         <Route path="matches" element={<MatchesPage />} />
         <Route path="matches/:matchId" element={<MatchDetailPage />} />
         <Route path="admin/login" element={<AdminLoginPage />} />
