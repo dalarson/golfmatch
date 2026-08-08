@@ -1,7 +1,7 @@
 begin;
 
 create extension if not exists pgtap with schema extensions;
-select extensions.plan(21);
+select extensions.plan(22);
 
 create temporary table fixture (
   key text primary key,
@@ -17,7 +17,11 @@ insert into fixture values
   ('e', public.create_player('Player E')),
   ('f', public.create_player('Player F')),
   ('g', public.create_player('Player G')),
-  ('h', public.create_player('Player H'));
+  ('h', public.create_player('Player H')),
+  ('i', public.create_player('Player I')),
+  ('j', public.create_player('Player J')),
+  ('k', public.create_player('Player K')),
+  ('l', public.create_player('Player L'));
 
 select extensions.is(public.calculate_elo_expected(1500, 1500), 0.5::numeric, 'equal ratings have 50% expectation');
 select extensions.is(public.get_result_value('PUSH'), 0.5::numeric, 'push result value is 0.5');
@@ -46,6 +50,61 @@ select extensions.is(
      )),
   1::bigint,
   'both doubles partners receive the same change'
+);
+
+update public.players
+set elo_rating = case name
+    when 'Player I' then 1300
+    when 'Player J' then 1301
+    else 1378
+  end,
+  elo_peak = 1500
+where id in (
+  (select id from fixture where key = 'i'),
+  (select id from fixture where key = 'j'),
+  (select id from fixture where key = 'k'),
+  (select id from fixture where key = 'l')
+);
+
+with inserted as (
+  insert into public.matches (
+    date, course_id, holes, team_size, score_type, score_value, holes_remaining
+  )
+  values (
+    date '2026-01-01',
+    (select id from fixture where key = 'course'),
+    18, 2, 'UP', 1, null
+  )
+  returning id
+)
+insert into fixture
+select 'fractional_doubles', id from inserted;
+
+insert into public.match_teams (match_id, team_number, result)
+values
+  ((select id from fixture where key = 'fractional_doubles'), 1, 'WIN'),
+  ((select id from fixture where key = 'fractional_doubles'), 2, 'LOSS');
+
+insert into public.match_team_players (match_team_id, match_id, player_id)
+select mt.id, mt.match_id, f.id
+from public.match_teams mt
+join fixture f on f.key = any(
+  case mt.team_number when 1 then array['i', 'j'] else array['k', 'l'] end
+)
+where mt.match_id = (select id from fixture where key = 'fractional_doubles');
+
+select public.apply_match_elo(
+  (select id from fixture where key = 'fractional_doubles'),
+  32
+);
+
+select extensions.is(
+  (select rating_change
+   from public.player_ratings
+   where match_id = (select id from fixture where key = 'fractional_doubles')
+     and player_id = (select id from fixture where key = 'i')),
+  20,
+  'fractional 1300.5 team average is not rounded before expected-score calculation'
 );
 
 insert into fixture

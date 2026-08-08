@@ -116,7 +116,7 @@ create index match_team_players_player_idx on public.match_team_players (player_
 create index player_ratings_player_created_idx on public.player_ratings (player_id, created_at);
 create index player_ratings_match_idx on public.player_ratings (match_id);
 
-create function public.calculate_elo_expected(rating_a integer, rating_b integer)
+create function public.calculate_elo_expected(rating_a numeric, rating_b numeric)
 returns numeric
 language sql
 immutable
@@ -144,8 +144,8 @@ $$;
 
 create function public.format_match_score(
   score_type public.score_type,
-  score_value smallint,
-  holes_remaining smallint
+  score_value integer,
+  holes_remaining integer
 )
 returns text
 language sql
@@ -346,11 +346,11 @@ begin
 
   v_team_1_change := round(p_k_factor * (
     public.get_result_value(v_team_1_result)
-    - public.calculate_elo_expected(round(v_team_1_rating)::integer, round(v_team_2_rating)::integer)
+    - public.calculate_elo_expected(v_team_1_rating, v_team_2_rating)
   ));
   v_team_2_change := round(p_k_factor * (
     public.get_result_value(v_team_2_result)
-    - public.calculate_elo_expected(round(v_team_2_rating)::integer, round(v_team_1_rating)::integer)
+    - public.calculate_elo_expected(v_team_2_rating, v_team_1_rating)
   ));
 
   for v_player in
@@ -978,9 +978,9 @@ grant select on public.elo_settings, public.players, public.courses, public.matc
   public.player_elo_history, public.match_summary, public.match_analytics
 to anon, authenticated;
 
-grant execute on function public.calculate_elo_expected(integer, integer),
+grant execute on function public.calculate_elo_expected(numeric, numeric),
   public.get_result_value(public.match_result),
-  public.format_match_score(public.score_type, smallint, smallint),
+  public.format_match_score(public.score_type, integer, integer),
   public.get_player_stats(uuid, uuid, uuid, uuid, smallint, smallint, date, date),
   public.get_player_overview(uuid)
 to anon, authenticated;
