@@ -942,10 +942,11 @@ begin
 
   perform 1 from public.players order by id for update;
   update public.players
-  set elo_rating = v_initial_rating, elo_peak = v_initial_rating, updated_at = now();
+  set elo_rating = v_initial_rating, elo_peak = v_initial_rating, updated_at = now()
+  where 1 = 1;
   get diagnostics players_processed = row_count;
 
-  delete from public.player_ratings;
+  delete from public.player_ratings where 1 = 1;
   matches_processed := 0;
 
   for v_match in
